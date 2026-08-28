@@ -1,0 +1,106 @@
+const asyncHandler = require('express-async-handler');
+const VendorProfile = require('../models/VendorProfile');
+const PlatformSettings = require('../models/PlatformSettings');
+const Order = require('../models/Order');
+const { notify } = require('../services/notify');
+
+// @desc  List vendors awaiting approval
+// @route GET /api/admin/vendors/pending
+const getPendingVendors = asyncHandler(async (req, res) => {
+  const vendors = await VendorProfile.find({ isApproved: false }).populate('user', 'name email phone').sort({ createdAt: 1 });
+  res.json(vendors);
+});
+
+// @desc  Approve a vendor — it becomes visible in customer discovery and can take orders
+// @route POST /api/admin/vendors/:id/approve
+const approveVendor = asyncHandler(async (req, res) => {
+  const vendor = await VendorProfile.findById(req.params.id);
+  if (!vendor) {
+    res.status(404);
+    throw new Error('Vendor not found');
+  }
+  vendor.isApproved = true;
+  await vendor.save();
+
+  const io = req.app.get('io');
+  await notify(io, {
+    userId: vendor.user,
+    type: 'vendor_approval',
+    title: 'Your kitchen is approved!',
+    body: `${vendor.businessName} is now live and visible to customers.`,
+  });
+
+  res.json(vendor);
+});
+
+// @desc  Reject a vendor's application (kept in the system, just not approved)
+// @route POST /api/admin/vendors/:id/reject
+const rejectVendor = asyncHandler(async (req, res) => {
+  const vendor = await VendorProfile.findById(req.params.id);
+  if (!vendor) {
+    res.status(404);
+    throw new Error('Vendor not found');
+  }
+  vendor.isApproved = false;
+  vendor.isOpen = false;
+  await vendor.save();
+
+  const io = req.app.get('io');
+  await notify(io, {
+    userId: vendor.user,
+    type: 'vendor_approval',
+    title: 'Kitchen application needs attention',
+    body: req.body.reason || 'Your kitchen listing was not approved. Please check your FSSAI license and details.',
+  });
+
+  res.json(vendor);
+});
+
+// @desc  Read platform-wide settings (delivery rollout, commission rates)
+// @route GET /api/admin/settings
+const getSettings = asyncHandler(async (req, res) => {
+  const settings = await PlatformSettings.getSingleton();
+  res.json(settings);
+});
+
+// @desc  Update platform-wide settings
+// @route PATCH /api/admin/settings
+const updateSettings = asyncHandler(async (req, res) => {
+  const settings = await PlatformSettings.getSingleton();
+  const { deliveryRolloutEnabled, platformCommissionRateFree, platformCommissionRatePro, proSubscriptionPricePerMonth } = req.body;
+
+  if (deliveryRolloutEnabled !== undefined) settings.deliveryRolloutEnabled = deliveryRolloutEnabled;
+  if (platformCommissionRateFree !== undefined) settings.platformCommissionRateFree = platformCommissionRateFree;
+  if (platformCommissionRatePro !== undefined) settings.platformCommissionRatePro = platformCommissionRatePro;
+  if (proSubscriptionPricePerMonth !== undefined) settings.proSubscriptionPricePerMonth = proSubscriptionPricePerMonth;
+
+  await settings.save();
+  res.json(settings);
+});
+
+// @desc  Platform-wide GMV/commission overview — the payout-ledger view a
+//        real business needs to know what it earned and what it owes vendors.
+// @route GET /api/admin/overview
+const getOverview = asyncHandler(async (req, res) => {
+  const orders = await Order.find({ paymentStatus: 'paid' });
+  const gmv = orders.reduce((s, o) => s + o.totalAmount, 0);
+  const commissionCollected = orders.reduce((s, o) => s + o.platformCommissionAmount, 0);
+  const vendorPayoutsOwed = orders
+    .filter((o) => o.status === 'Completed')
+    .reduce((s, o) => s + o.vendorPayoutAmount, 0);
+  const totalVendors = await VendorProfile.countDocuments();
+  const pendingVendors = await VendorProfile.countDocuments({ isApproved: false });
+  const proVendors = await VendorProfile.countDocuments({ subscriptionPlan: 'pro' });
+
+  res.json({
+    totalOrders: orders.length,
+    gmv,
+    commissionCollected,
+    vendorPayoutsOwed,
+    totalVendors,
+    pendingVendors,
+    proVendors,
+  });
+});
+
+module.exports = { getPendingVendors, approveVendor, rejectVendor, getSettings, updateSettings, getOverview };

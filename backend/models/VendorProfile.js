@@ -1,0 +1,46 @@
+const mongoose = require('mongoose');
+
+const vendorProfileSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+    businessName: { type: String, required: true, trim: true },
+    fssaiLicense: { type: String, required: true, trim: true },
+    description: { type: String, default: '' },
+    kitchenPhotoUrl: { type: String, default: '' },
+    kitchenLocation: {
+      type: {
+        type: String,
+        enum: ['Point'],
+        default: 'Point',
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        required: true,
+      },
+      address: { type: String, default: '' },
+    },
+    deliveryEnabled: { type: Boolean, default: false },
+    maxDeliveryRadiusKm: { type: Number, default: 5, min: 0, max: 50 },
+    deliveryFee: { type: Number, default: 0, min: 0 },
+    isVegOnly: { type: Boolean, default: false },
+    totalOrdersCompleted: { type: Number, default: 0 },
+    averageRating: { type: Number, default: 0, min: 0, max: 5 },
+    ratingCount: { type: Number, default: 0 },
+    // A real moderation queue now exists (see adminController) — new vendors
+    // wait for admin approval before appearing in customer-facing discovery
+    // or being able to receive orders.
+    isApproved: { type: Boolean, default: false },
+    isOpen: { type: Boolean, default: true },
+
+    // Optional paid tier: a lower per-order commission in exchange for a
+    // flat monthly fee, plus priority placement — a second, volume-independent
+    // revenue lever alongside per-order commission (see Order.platformCommissionRate).
+    subscriptionPlan: { type: String, enum: ['free', 'pro'], default: 'free' },
+    subscriptionExpiresAt: { type: Date, default: null },
+  },
+  { timestamps: true }
+);
+
+vendorProfileSchema.index({ kitchenLocation: '2dsphere' });
+
+module.exports = mongoose.model('VendorProfile', vendorProfileSchema);
