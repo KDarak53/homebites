@@ -45,8 +45,21 @@ const getMyMenu = asyncHandler(async (req, res) => {
 const createProduct = asyncHandler(async (req, res) => {
   const vendor = await getOwnVendorProfileOr403(req.user._id);
 
-  const { itemName, description, isVeg, price, maxQuantityPerBatch, imageUrl, availableForDirectOrder, availableForPrebook, prebookCutoffTime, nextBatchQuantity } =
-    req.body;
+  const {
+    itemName,
+    description,
+    isVeg,
+    price,
+    maxQuantityPerBatch,
+    imageUrl,
+    availableForDirectOrder,
+    availableForPrebook,
+    prebookOpensAt,
+    prebookCutoffTime,
+    nextBatchQuantity,
+    collectionStartTime,
+    collectionEndTime,
+  } = req.body;
 
   const product = await Product.create({
     vendor: vendor._id,
@@ -59,8 +72,11 @@ const createProduct = asyncHandler(async (req, res) => {
     currentQuantity: maxQuantityPerBatch,
     availableForDirectOrder,
     availableForPrebook,
+    prebookOpensAt: prebookOpensAt || null,
     prebookCutoffTime,
     nextBatchQuantity: nextBatchQuantity || 0,
+    collectionStartTime: collectionStartTime || null,
+    collectionEndTime: collectionEndTime || null,
   });
 
   res.status(201).json(product);
@@ -87,8 +103,11 @@ const updateProduct = asyncHandler(async (req, res) => {
     'currentQuantity',
     'availableForDirectOrder',
     'availableForPrebook',
+    'prebookOpensAt',
     'prebookCutoffTime',
     'nextBatchQuantity',
+    'collectionStartTime',
+    'collectionEndTime',
     'isActive',
   ];
 
@@ -113,7 +132,10 @@ const openNextBatch = asyncHandler(async (req, res) => {
 
   product.currentQuantity = product.nextBatchQuantity || product.maxQuantityPerBatch;
   product.nextBatchQuantity = 0;
+  product.prebookOpensAt = req.body.prebookOpensAt || null;
   product.prebookCutoffTime = req.body.prebookCutoffTime || null;
+  product.collectionStartTime = req.body.collectionStartTime || null;
+  product.collectionEndTime = req.body.collectionEndTime || null;
   await product.save();
 
   res.json(product);

@@ -17,11 +17,20 @@ const productSchema = new mongoose.Schema(
     availableForDirectOrder: { type: Boolean, default: true },
     availableForPrebook: { type: Boolean, default: true },
 
-    // Pre-book cut-off: customers can reserve from the NEXT batch until this
-    // timestamp; vendor resets it each cycle (e.g. "today 8:00 PM" for
-    // tomorrow's batch).
+    // Pre-book window: customers can reserve from the NEXT batch only between
+    // these two timestamps. prebookOpensAt is optional — leaving it unset
+    // means the window is open immediately and only prebookCutoffTime (the
+    // close time) gates it, preserving the old cutoff-only behavior.
+    prebookOpensAt: { type: Date, default: null },
     prebookCutoffTime: { type: Date, default: null },
     nextBatchQuantity: { type: Number, default: 0, min: 0 },
+
+    // When the pre-ordered batch will actually be ready to hand over —
+    // distinct from the order window above (which is when customers can
+    // *place* the order). Shown to customers and used to bound the
+    // pickup/delivery time they pick at checkout.
+    collectionStartTime: { type: Date, default: null },
+    collectionEndTime: { type: Date, default: null },
 
     isActive: { type: Boolean, default: true },
   },
@@ -31,8 +40,12 @@ const productSchema = new mongoose.Schema(
 productSchema.index({ vendor: 1, isActive: 1 });
 
 productSchema.virtual('isPrebookOpen').get(function isPrebookOpen() {
+  const now = Date.now();
   return Boolean(
-    this.availableForPrebook && this.prebookCutoffTime && this.prebookCutoffTime.getTime() > Date.now()
+    this.availableForPrebook &&
+      this.prebookCutoffTime &&
+      this.prebookCutoffTime.getTime() > now &&
+      (!this.prebookOpensAt || this.prebookOpensAt.getTime() <= now)
   );
 });
 

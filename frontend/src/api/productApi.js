@@ -19,10 +19,10 @@ export const productApi = apiSlice.injectEndpoints({
       invalidatesTags: ['Product'],
     }),
     openNextBatch: builder.mutation({
-      query: ({ id, prebookCutoffTime }) => ({
+      query: ({ id, prebookOpensAt, prebookCutoffTime, collectionStartTime, collectionEndTime }) => ({
         url: `/products/${id}/open-next-batch`,
         method: 'POST',
-        body: { prebookCutoffTime },
+        body: { prebookOpensAt, prebookCutoffTime, collectionStartTime, collectionEndTime },
       }),
       invalidatesTags: ['Product'],
     }),

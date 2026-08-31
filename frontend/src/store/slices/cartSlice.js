@@ -17,7 +17,8 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     addItem: (state, action) => {
-      const { productId, itemName, price, quantity, orderType, vendorId, vendorName } = action.payload;
+      const { productId, itemName, price, quantity, orderType, vendorId, vendorName, collectionStartTime, collectionEndTime } =
+        action.payload;
 
       // Cart is single-vendor and single-orderType: the backend creates one
       // order per checkout with one orderType, so switching vendor or
@@ -33,7 +34,7 @@ const cartSlice = createSlice({
       if (existing) {
         existing.quantity += quantity;
       } else {
-        state.items.push({ productId, itemName, price, quantity, orderType });
+        state.items.push({ productId, itemName, price, quantity, orderType, collectionStartTime, collectionEndTime });
       }
     },
     removeItem: (state, action) => {

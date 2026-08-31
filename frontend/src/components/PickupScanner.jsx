@@ -35,11 +35,16 @@ export default function PickupScanner() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
+      // The <video> element is always mounted (see JSX below) — just hidden
+      // until scanning starts — specifically so videoRef.current is already
+      // attached here. Flipping `scanning` on first and assigning srcObject
+      // after would race: the element the ref points to gets swapped out by
+      // the re-render before the stream is ever attached to it.
+      setScanning(true);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-      setScanning(true);
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -62,8 +67,8 @@ export default function PickupScanner() {
       };
       rafRef.current = requestAnimationFrame(tick);
     } catch (err) {
+      stopCamera();
       setCameraError(err.message || 'Could not access camera');
-      setScanning(false);
     }
   };
 
@@ -79,18 +84,19 @@ export default function PickupScanner() {
         Scan the customer's QR code, or type the code they show you, to mark that order Completed.
       </p>
 
-      {!scanning ? (
+      {!scanning && (
         <button onClick={startCamera} className="btn-primary text-sm px-4 py-2 mb-3">
           📸 Start camera scanner
         </button>
-      ) : (
-        <div className="mb-3">
-          <video ref={videoRef} className="w-full max-w-xs rounded-xl border-2 border-orange-300 shadow-sm" muted playsInline />
-          <button onClick={stopCamera} className="text-xs text-slate-500 mt-1.5 hover:text-slate-700">
-            Stop camera
-          </button>
-        </div>
       )}
+      {/* Always mounted (just hidden) so videoRef is attached before the
+          camera stream needs it — see the comment in startCamera above. */}
+      <div className={scanning ? 'mb-3' : 'hidden'}>
+        <video ref={videoRef} className="w-full max-w-xs rounded-xl border-2 border-orange-300 shadow-sm" muted playsInline />
+        <button onClick={stopCamera} className="text-xs text-slate-500 mt-1.5 hover:text-slate-700">
+          Stop camera
+        </button>
+      </div>
       {cameraError && (
         <p className="text-xs text-amber-700 mb-3 bg-amber-50 rounded-lg px-3 py-1.5">
           Camera unavailable ({cameraError}) — use the manual code entry below instead.

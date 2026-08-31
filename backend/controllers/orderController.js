@@ -68,6 +68,23 @@ async function validateAndPrice({ vendorId, items, orderType, fulfillmentMethod,
     const qty = Number(line.quantity);
     if (!qty || qty < 1) throw new Error(`Invalid quantity for ${product.itemName}`);
     itemsTotal += product.price * qty;
+
+    // If the vendor has set a collection window for this item's next batch,
+    // the customer's chosen pickup/delivery time must actually fall inside
+    // it — otherwise "scheduled for 2am" against a "ready 6-8pm" batch would
+    // silently go through.
+    if (orderType === 'Prebook' && (product.collectionStartTime || product.collectionEndTime)) {
+      const when = new Date(scheduledFor).getTime();
+      const start = product.collectionStartTime ? product.collectionStartTime.getTime() : -Infinity;
+      const end = product.collectionEndTime ? product.collectionEndTime.getTime() : Infinity;
+      if (Number.isNaN(when) || when < start || when > end) {
+        throw new Error(
+          `${product.itemName} is only ready for collection between ${
+            product.collectionStartTime ? product.collectionStartTime.toLocaleString() : 'now'
+          } and ${product.collectionEndTime ? product.collectionEndTime.toLocaleString() : 'further notice'}`
+        );
+      }
+    }
   }
 
   const deliveryFee = fulfillmentMethod === 'Delivery' ? vendor.deliveryFee || 0 : 0;
@@ -158,9 +175,20 @@ const confirmPayment = asyncHandler(async (req, res) => {
             throw new Error(`Only limited stock left for ${product.itemName}; someone just grabbed it`);
           }
         } else {
-          // Prebook: draw from the next batch, gated by the cutoff timer.
-          if (!product.availableForPrebook || !product.prebookCutoffTime || product.prebookCutoffTime.getTime() <= Date.now()) {
-            throw new Error(`Pre-booking is closed for ${product.itemName}`);
+          // Prebook: draw from the next batch, gated by the open/close window.
+          const now = Date.now();
+          const windowNotOpenYet = product.prebookOpensAt && product.prebookOpensAt.getTime() > now;
+          if (
+            !product.availableForPrebook ||
+            !product.prebookCutoffTime ||
+            product.prebookCutoffTime.getTime() <= now ||
+            windowNotOpenYet
+          ) {
+            throw new Error(
+              windowNotOpenYet
+                ? `Pre-booking for ${product.itemName} opens ${product.prebookOpensAt.toLocaleString()}`
+                : `Pre-booking is closed for ${product.itemName}`
+            );
           }
           fromBatch = 'next';
           const updated = await Product.findOneAndUpdate(

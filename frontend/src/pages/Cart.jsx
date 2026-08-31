@@ -35,6 +35,33 @@ export default function Cart() {
   const deliveryFee = fulfillmentMethod === 'Delivery' ? vendor?.deliveryFee || 0 : 0;
   const total = itemsTotal + deliveryFee;
 
+  // Narrowest collection window across every pre-booked item in the cart —
+  // items without one set don't constrain it. If items disagree so badly
+  // the window inverts (from > until), collectionWindow.invalid flags that
+  // so we can surface it instead of quietly enforcing something impossible.
+  const collectionWindow = (() => {
+    if (orderType !== 'Prebook') return null;
+    let from = null;
+    let until = null;
+    for (const item of cart.items) {
+      if (item.collectionStartTime) {
+        const t = new Date(item.collectionStartTime);
+        if (!from || t > from) from = t;
+      }
+      if (item.collectionEndTime) {
+        const t = new Date(item.collectionEndTime);
+        if (!until || t < until) until = t;
+      }
+    }
+    if (!from && !until) return null;
+    return { from, until, invalid: from && until && from > until };
+  })();
+
+  const toDatetimeLocalValue = (date) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
   if (cart.items.length === 0) {
     return (
       <div className="max-w-xl mx-auto p-4 text-center py-20">
@@ -47,6 +74,19 @@ export default function Cart() {
 
   const handleCheckout = async () => {
     setCheckoutError('');
+
+    if (orderType === 'Prebook' && collectionWindow && !collectionWindow.invalid) {
+      const chosen = new Date(scheduledFor);
+      if ((collectionWindow.from && chosen < collectionWindow.from) || (collectionWindow.until && chosen > collectionWindow.until)) {
+        setCheckoutError(
+          `Please pick a time the vendor can actually hand this over: ${
+            collectionWindow.from ? collectionWindow.from.toLocaleString() : 'now'
+          } – ${collectionWindow.until ? collectionWindow.until.toLocaleString() : 'further notice'}.`
+        );
+        return;
+      }
+    }
+
     const orderPayload = {
       vendorId: cart.vendorId,
       items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
@@ -176,9 +216,23 @@ export default function Cart() {
               type="datetime-local"
               value={scheduledFor}
               onChange={(e) => setScheduledFor(e.target.value)}
+              min={collectionWindow?.from ? toDatetimeLocalValue(collectionWindow.from) : undefined}
+              max={collectionWindow?.until ? toDatetimeLocalValue(collectionWindow.until) : undefined}
               required
               className="input text-sm"
             />
+            {collectionWindow && !collectionWindow.invalid && (
+              <p className="text-xs text-slate-400 mt-1">
+                🥡 Vendor will have this ready {collectionWindow.from ? `from ${collectionWindow.from.toLocaleString()}` : ''}
+                {collectionWindow.from && collectionWindow.until && ' '}
+                {collectionWindow.until ? `until ${collectionWindow.until.toLocaleString()}` : ''}
+              </p>
+            )}
+            {collectionWindow?.invalid && (
+              <p className="text-xs text-amber-700 mt-1">
+                ⚠️ Items in this cart have conflicting collection times — check with the vendor before picking a time.
+              </p>
+            )}
           </div>
         )}
       </div>

@@ -75,6 +75,8 @@ function MenuItemCard({ item, vendorId, vendorName }) {
         orderType,
         vendorId,
         vendorName,
+        collectionStartTime: item.collectionStartTime || null,
+        collectionEndTime: item.collectionEndTime || null,
       })
     );
   };
@@ -102,6 +104,13 @@ function MenuItemCard({ item, vendorId, vendorName }) {
           )}
           {item.canPrebook && ' · Pre-book open for next batch'}
         </p>
+        {item.availableForPrebook && (item.collectionStartTime || item.collectionEndTime) && (
+          <p className="text-xs text-slate-400 mt-0.5">
+            🥡 Ready for collection: {item.collectionStartTime ? new Date(item.collectionStartTime).toLocaleString() : 'now'}
+            {' → '}
+            {item.collectionEndTime ? new Date(item.collectionEndTime).toLocaleString() : 'further notice'}
+          </p>
+        )}
         </div>
       </div>
 
