@@ -170,7 +170,14 @@ function PrebookWindowControl({ product }) {
         </label>
         <button
           disabled={saving}
-          onClick={() => updateProduct({ id: product._id, prebookOpensAt: localDatetimeToISO(opensAt), prebookCutoffTime: localDatetimeToISO(closesAt) })}
+          onClick={() =>
+            updateProduct({
+              id: product._id,
+              prebookOpensAt: localDatetimeToISO(opensAt),
+              prebookCutoffTime: localDatetimeToISO(closesAt),
+              nextBatchQuantity: nextBatchQty,
+            })
+          }
           className="btn-ghost text-xs px-2.5 py-1 bg-slate-100"
         >
           Set window
