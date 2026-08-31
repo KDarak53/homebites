@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useGetVendorByIdQuery } from '../api/vendorApi';
 import { useGetMenuByVendorQuery } from '../api/productApi';
 import { useGetVendorPlansQuery, useInitiateSubscriptionPaymentMutation, useConfirmSubscriptionPaymentMutation } from '../api/subscriptionApi';
-import { addItem } from '../store/slices/cartSlice';
+import { addItem, removeItem, updateQuantity } from '../store/slices/cartSlice';
 import { getVendorVisual } from '../utils/vendorVisuals';
 import { collectPayment } from '../utils/razorpay';
 import { resolveImageUrl } from '../constants';
@@ -62,8 +62,39 @@ function SubscriptionPlanCard({ plan }) {
   );
 }
 
+// Compact +/- control shown in place of the "Add now"/"Pre-book" button once
+// that line is already in the cart — gives immediate, visible feedback that
+// the tap registered, instead of the button just silently staying clickable.
+function QuantityStepper({ quantity, onIncrement, onDecrement, label }) {
+  return (
+    <div className="flex items-center gap-3 bg-orange-50 rounded-full pl-1 pr-1 py-1" aria-label={label}>
+      <button
+        onClick={onDecrement}
+        aria-label={`Remove one ${label}`}
+        className="w-8 h-8 rounded-full bg-white shadow-sm text-orange-600 text-lg font-bold flex items-center justify-center hover:bg-orange-100 active:scale-95 transition-transform"
+      >
+        −
+      </button>
+      <span className="min-w-[1.25rem] text-center text-sm font-bold text-slate-800 tabular-nums">{quantity}</span>
+      <button
+        onClick={onIncrement}
+        aria-label={`Add one more ${label}`}
+        className="w-8 h-8 rounded-full bg-white shadow-sm text-orange-600 text-lg font-bold flex items-center justify-center hover:bg-orange-100 active:scale-95 transition-transform"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
 function MenuItemCard({ item, vendorId, vendorName }) {
   const dispatch = useDispatch();
+  const cart = useSelector((s) => s.cart);
+
+  // Cart is single-vendor, so a line here only counts if the cart hasn't
+  // already been claimed by a different vendor (see cartSlice.addItem).
+  const cartLine = (orderType) =>
+    cart.vendorId && cart.vendorId !== vendorId ? null : cart.items.find((i) => i.productId === item._id && i.orderType === orderType);
 
   const handleAdd = (orderType) => {
     dispatch(
@@ -81,8 +112,16 @@ function MenuItemCard({ item, vendorId, vendorName }) {
     );
   };
 
+  const handleDecrement = (line) => {
+    if (line.quantity <= 1) dispatch(removeItem(item._id));
+    else dispatch(updateQuantity({ productId: item._id, quantity: line.quantity - 1 }));
+  };
+
+  const directLine = cartLine('Direct');
+  const prebookLine = cartLine('Prebook');
+
   return (
-    <div className="card card-hover p-4 flex justify-between items-start gap-4">
+    <div className="card card-hover p-4 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
       <div className="flex gap-3 min-w-0">
         {item.imageUrl && (
           <img src={resolveImageUrl(item.imageUrl)} alt={item.itemName} className="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0" />
@@ -114,22 +153,40 @@ function MenuItemCard({ item, vendorId, vendorName }) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 shrink-0">
-        <button
-          disabled={!item.canOrderDirect}
-          onClick={() => handleAdd('Direct')}
-          className="btn-primary text-sm px-3.5 py-1.5 disabled:!bg-none disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
-        >
-          Add now
-        </button>
-        {item.availableForPrebook && (
+      <div className="flex flex-row sm:flex-col gap-2 shrink-0">
+        {directLine ? (
+          <QuantityStepper
+            label={`${item.itemName} (direct)`}
+            quantity={directLine.quantity}
+            onIncrement={() => handleAdd('Direct')}
+            onDecrement={() => handleDecrement(directLine)}
+          />
+        ) : (
           <button
-            disabled={!item.canPrebook}
-            onClick={() => handleAdd('Prebook')}
-            className="btn-outline text-sm px-3.5 py-1.5 disabled:border-slate-200 disabled:text-slate-400 disabled:bg-white"
+            disabled={!item.canOrderDirect}
+            onClick={() => handleAdd('Direct')}
+            className="btn-primary text-sm px-3.5 py-1.5 disabled:!bg-none disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
           >
-            Pre-book
+            Add now
           </button>
+        )}
+        {item.availableForPrebook && (
+          prebookLine ? (
+            <QuantityStepper
+              label={`${item.itemName} (pre-book)`}
+              quantity={prebookLine.quantity}
+              onIncrement={() => handleAdd('Prebook')}
+              onDecrement={() => handleDecrement(prebookLine)}
+            />
+          ) : (
+            <button
+              disabled={!item.canPrebook}
+              onClick={() => handleAdd('Prebook')}
+              className="btn-outline text-sm px-3.5 py-1.5 disabled:border-slate-200 disabled:text-slate-400 disabled:bg-white"
+            >
+              Pre-book
+            </button>
+          )
         )}
       </div>
     </div>

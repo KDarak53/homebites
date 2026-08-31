@@ -49,7 +49,7 @@ export default function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto card p-2 z-40 shadow-lg">
+          <div className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-1.5rem))] max-h-96 overflow-y-auto card p-2 z-40 shadow-lg">
             <div className="flex justify-between items-center px-2 py-1 mb-1">
               <p className="text-sm font-semibold text-slate-700">Notifications</p>
               {unreadCount > 0 && (

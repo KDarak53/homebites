@@ -130,20 +130,34 @@ export default function Cart() {
 
       <div className="card divide-y divide-slate-100 mb-4">
         {cart.items.map((item) => (
-          <div key={item.productId} className="flex items-center justify-between p-3.5">
-            <div>
-              <p className="font-medium text-slate-800">{item.itemName}</p>
+          <div key={item.productId} className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3.5">
+            <div className="min-w-0">
+              <p className="font-medium text-slate-800 truncate">{item.itemName}</p>
               <p className="text-xs text-slate-400">{item.orderType} &middot; ₹{item.price} each</p>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                value={item.quantity}
-                onChange={(e) => dispatch(updateQuantity({ productId: item.productId, quantity: Number(e.target.value) }))}
-                className="input w-16 py-1 text-sm text-center"
-              />
-              <button onClick={() => dispatch(removeItem(item.productId))} className="text-red-500 text-sm hover:text-red-600 font-medium">
+            <div className="flex items-center justify-between xs:justify-end gap-3 shrink-0">
+              <div className="flex items-center gap-3 bg-orange-50 rounded-full pl-1 pr-1 py-1">
+                <button
+                  onClick={() =>
+                    item.quantity <= 1
+                      ? dispatch(removeItem(item.productId))
+                      : dispatch(updateQuantity({ productId: item.productId, quantity: item.quantity - 1 }))
+                  }
+                  aria-label={`Remove one ${item.itemName}`}
+                  className="w-8 h-8 rounded-full bg-white shadow-sm text-orange-600 text-lg font-bold flex items-center justify-center hover:bg-orange-100 active:scale-95 transition-transform"
+                >
+                  −
+                </button>
+                <span className="min-w-[1.25rem] text-center text-sm font-bold text-slate-800 tabular-nums">{item.quantity}</span>
+                <button
+                  onClick={() => dispatch(updateQuantity({ productId: item.productId, quantity: item.quantity + 1 }))}
+                  aria-label={`Add one more ${item.itemName}`}
+                  className="w-8 h-8 rounded-full bg-white shadow-sm text-orange-600 text-lg font-bold flex items-center justify-center hover:bg-orange-100 active:scale-95 transition-transform"
+                >
+                  +
+                </button>
+              </div>
+              <button onClick={() => dispatch(removeItem(item.productId))} className="text-red-500 text-xs hover:text-red-600 font-medium">
                 Remove
               </button>
             </div>

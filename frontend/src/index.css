@@ -3,6 +3,10 @@
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Fredoka', 'Inter', system-ui, sans-serif;
+  /* Extra breakpoint below `sm` (640px) — for the narrowest phones in
+     portrait (roughly <400px), where even a two-column row (e.g. an item
+     name next to its quantity stepper) needs to stack instead. */
+  --breakpoint-xs: 26rem;
 }
 
 html, body, #root {
@@ -14,6 +18,19 @@ body {
   font-family: var(--font-sans);
   background: linear-gradient(180deg, #fff7ed 0%, #fef9f4 240px, #f8fafc 460px);
   color: #1e293b;
+  /* Safety net, not a fix in itself: nothing in the layout should need to
+     scroll sideways, so if something miscalculates on a narrow screen this
+     clips it instead of letting the whole page shift/scroll horizontally. */
+  overflow-x: hidden;
+}
+
+/* Portrait phones: a touch of breathing room back since the page containers
+   use a flat p-4 (1rem) at every size — fine on desktop, a little tight
+   against a 375px-wide screen. */
+@media (max-width: 480px) {
+  .card {
+    border-radius: 1rem;
+  }
 }
 
 h1, h2, h3 {
