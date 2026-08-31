@@ -13,3 +13,15 @@ export const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
 // absolute) — this handles both so seed data can point straight at stock
 // photo URLs without needing to upload anything.
 export const resolveImageUrl = (url) => (/^https?:\/\//i.test(url) ? url : `${API_ORIGIN}${url}`);
+
+// A <input type="datetime-local"> value (e.g. "2026-09-01T09:15") has no
+// timezone attached — `new Date(...)` on THIS browser correctly reads it as
+// this browser's local wall-clock time (which is what the user actually
+// picked), but sending that raw string to the API is a trap: the server
+// re-parses it as ITS OWN local time. Locally that's a no-op if dev server
+// and browser share a timezone, but in production the API runs in a
+// different timezone (e.g. UTC on Render) than the browser (e.g. IST) — the
+// same clock-face string then means a different real moment, silently
+// shifting order windows by whole hours. Always convert to a real UTC
+// instant client-side before it leaves the browser.
+export const localDatetimeToISO = (value) => (value ? new Date(value).toISOString() : null);

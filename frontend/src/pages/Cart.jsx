@@ -5,7 +5,7 @@ import { useGetVendorByIdQuery } from '../api/vendorApi';
 import { useInitiateOrderPaymentMutation, useConfirmOrderPaymentMutation } from '../api/orderApi';
 import { removeItem, updateQuantity, clearCart } from '../store/slices/cartSlice';
 import useGeolocation from '../hooks/useGeolocation';
-import { DEFAULT_LOCATION } from '../constants';
+import { DEFAULT_LOCATION, localDatetimeToISO } from '../constants';
 import { collectPayment } from '../utils/razorpay';
 
 export default function Cart() {
@@ -92,7 +92,7 @@ export default function Cart() {
       items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
       orderType,
       fulfillmentMethod,
-      scheduledFor: orderType === 'Prebook' ? scheduledFor : undefined,
+      scheduledFor: orderType === 'Prebook' ? localDatetimeToISO(scheduledFor) : undefined,
       deliveryCoordinates: fulfillmentMethod === 'Delivery' ? [deliveryLocation.longitude, deliveryLocation.latitude] : undefined,
       deliveryAddress: fulfillmentMethod === 'Delivery' ? address : undefined,
     };

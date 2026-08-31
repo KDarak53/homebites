@@ -7,6 +7,7 @@ import {
   useDeleteProductMutation,
 } from '../../api/productApi';
 import ImageUploader from '../../components/ImageUploader';
+import { localDatetimeToISO } from '../../constants';
 
 const emptyForm = {
   itemName: '',
@@ -169,7 +170,7 @@ function PrebookWindowControl({ product }) {
         </label>
         <button
           disabled={saving}
-          onClick={() => updateProduct({ id: product._id, prebookOpensAt: opensAt || null, prebookCutoffTime: closesAt || null })}
+          onClick={() => updateProduct({ id: product._id, prebookOpensAt: localDatetimeToISO(opensAt), prebookCutoffTime: localDatetimeToISO(closesAt) })}
           className="btn-ghost text-xs px-2.5 py-1 bg-slate-100"
         >
           Set window
@@ -190,7 +191,7 @@ function PrebookWindowControl({ product }) {
         </label>
         <button
           disabled={saving}
-          onClick={() => updateProduct({ id: product._id, collectionStartTime: collectFrom || null, collectionEndTime: collectUntil || null })}
+          onClick={() => updateProduct({ id: product._id, collectionStartTime: localDatetimeToISO(collectFrom), collectionEndTime: localDatetimeToISO(collectUntil) })}
           className="btn-ghost text-xs px-2.5 py-1 bg-slate-100"
         >
           Set collection time
@@ -213,10 +214,10 @@ function PrebookWindowControl({ product }) {
           onClick={() =>
             openNextBatch({
               id: product._id,
-              prebookOpensAt: opensAt || null,
-              prebookCutoffTime: closesAt || null,
-              collectionStartTime: collectFrom || null,
-              collectionEndTime: collectUntil || null,
+              prebookOpensAt: localDatetimeToISO(opensAt),
+              prebookCutoffTime: localDatetimeToISO(closesAt),
+              collectionStartTime: localDatetimeToISO(collectFrom),
+              collectionEndTime: localDatetimeToISO(collectUntil),
             })
           }
           className="btn-primary text-xs px-2.5 py-1"
