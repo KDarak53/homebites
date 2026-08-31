@@ -7,7 +7,7 @@ import { useGetVendorPlansQuery, useInitiateSubscriptionPaymentMutation, useConf
 import { addItem } from '../store/slices/cartSlice';
 import { getVendorVisual } from '../utils/vendorVisuals';
 import { collectPayment } from '../utils/razorpay';
-import { API_ORIGIN } from '../constants';
+import { resolveImageUrl } from '../constants';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -85,7 +85,7 @@ function MenuItemCard({ item, vendorId, vendorName }) {
     <div className="card card-hover p-4 flex justify-between items-start gap-4">
       <div className="flex gap-3 min-w-0">
         {item.imageUrl && (
-          <img src={`${API_ORIGIN}${item.imageUrl}`} alt={item.itemName} className="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0" />
+          <img src={resolveImageUrl(item.imageUrl)} alt={item.itemName} className="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0" />
         )}
         <div className="min-w-0">
         <div className="flex items-center gap-2">

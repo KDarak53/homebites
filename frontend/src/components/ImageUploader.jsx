@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { API_ORIGIN } from '../constants';
+import { resolveImageUrl } from '../constants';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -41,7 +41,7 @@ export default function ImageUploader({ value, onUploaded, label = 'Photo' }) {
   return (
     <div className="flex items-center gap-3">
       {value ? (
-        <img src={`${API_ORIGIN}${value}`} alt="" className="w-14 h-14 rounded-xl object-cover border border-slate-200" />
+        <img src={resolveImageUrl(value)} alt="" className="w-14 h-14 rounded-xl object-cover border border-slate-200" />
       ) : (
         <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center text-xl text-slate-300 shrink-0">📷</div>
       )}
