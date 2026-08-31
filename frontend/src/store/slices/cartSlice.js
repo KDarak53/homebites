@@ -17,8 +17,18 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     addItem: (state, action) => {
-      const { productId, itemName, price, quantity, orderType, vendorId, vendorName, collectionStartTime, collectionEndTime } =
-        action.payload;
+      const {
+        productId,
+        itemName,
+        price,
+        quantity,
+        orderType,
+        vendorId,
+        vendorName,
+        collectionStartTime,
+        collectionEndTime,
+        maxQuantity,
+      } = action.payload;
 
       // Cart is single-vendor and single-orderType: the backend creates one
       // order per checkout with one orderType, so switching vendor or
@@ -30,11 +40,28 @@ const cartSlice = createSlice({
       state.vendorId = vendorId;
       state.vendorName = vendorName;
 
+      // maxQuantity is the vendor's currently-known remaining stock for this
+      // order type (currentQuantity for Direct, nextBatchQuantity for
+      // Prebook) — a soft client-side cap so the customer can't build a cart
+      // the checkout is guaranteed to reject. Not authoritative (someone
+      // else could buy in the meantime); the backend's atomic stock check
+      // at payment-confirm is still what actually protects inventory.
+      const cap = maxQuantity ?? Infinity;
       const existing = state.items.find((i) => i.productId === productId && i.orderType === orderType);
       if (existing) {
-        existing.quantity += quantity;
+        existing.maxQuantity = maxQuantity;
+        existing.quantity = Math.min(existing.quantity + quantity, cap);
       } else {
-        state.items.push({ productId, itemName, price, quantity, orderType, collectionStartTime, collectionEndTime });
+        state.items.push({
+          productId,
+          itemName,
+          price,
+          quantity: Math.min(quantity, cap),
+          orderType,
+          collectionStartTime,
+          collectionEndTime,
+          maxQuantity,
+        });
       }
     },
     removeItem: (state, action) => {
@@ -43,7 +70,7 @@ const cartSlice = createSlice({
     updateQuantity: (state, action) => {
       const { productId, quantity } = action.payload;
       const item = state.items.find((i) => i.productId === productId);
-      if (item) item.quantity = Math.max(1, quantity);
+      if (item) item.quantity = Math.min(Math.max(1, quantity), item.maxQuantity ?? Infinity);
     },
     setFulfillmentMethod: (state, action) => {
       state.fulfillmentMethod = action.payload;

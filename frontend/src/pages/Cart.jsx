@@ -151,8 +151,9 @@ export default function Cart() {
                 <span className="min-w-[1.25rem] text-center text-sm font-bold text-slate-800 tabular-nums">{item.quantity}</span>
                 <button
                   onClick={() => dispatch(updateQuantity({ productId: item.productId, quantity: item.quantity + 1 }))}
+                  disabled={item.maxQuantity != null && item.quantity >= item.maxQuantity}
                   aria-label={`Add one more ${item.itemName}`}
-                  className="w-8 h-8 rounded-full bg-white shadow-sm text-orange-600 text-lg font-bold flex items-center justify-center hover:bg-orange-100 active:scale-95 transition-transform"
+                  className="w-8 h-8 rounded-full bg-white shadow-sm text-orange-600 text-lg font-bold flex items-center justify-center hover:bg-orange-100 active:scale-95 transition-transform disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white"
                 >
                   +
                 </button>
@@ -161,6 +162,9 @@ export default function Cart() {
                 Remove
               </button>
             </div>
+            {item.maxQuantity != null && item.quantity >= item.maxQuantity && (
+              <p className="text-[11px] text-amber-600 xs:text-right w-full">Max available quantity reached</p>
+            )}
           </div>
         ))}
       </div>

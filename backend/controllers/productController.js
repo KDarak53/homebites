@@ -20,11 +20,13 @@ const getMenuByVendor = asyncHandler(async (req, res) => {
   });
 
   // orderability flag mirrors the "Add to Cart" disable rule:
-  // available if currentQuantity > 0 OR a pre-book window is still open.
+  // available if currentQuantity > 0 OR a pre-book window is open AND the
+  // next batch actually has room left (a window can be open with the batch
+  // already fully reserved by other customers).
   const withAvailability = products.map((p) => {
     const obj = p.toObject();
     obj.canOrderDirect = p.availableForDirectOrder && p.currentQuantity > 0;
-    obj.canPrebook = p.availableForPrebook && obj.isPrebookOpen;
+    obj.canPrebook = p.availableForPrebook && obj.isPrebookOpen && p.nextBatchQuantity > 0;
     obj.isOrderable = obj.canOrderDirect || obj.canPrebook;
     return obj;
   });

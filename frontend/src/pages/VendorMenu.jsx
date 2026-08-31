@@ -65,24 +65,28 @@ function SubscriptionPlanCard({ plan }) {
 // Compact +/- control shown in place of the "Add now"/"Pre-book" button once
 // that line is already in the cart — gives immediate, visible feedback that
 // the tap registered, instead of the button just silently staying clickable.
-function QuantityStepper({ quantity, onIncrement, onDecrement, label }) {
+function QuantityStepper({ quantity, onIncrement, onDecrement, label, atMax }) {
   return (
-    <div className="flex items-center gap-3 bg-orange-50 rounded-full pl-1 pr-1 py-1" aria-label={label}>
-      <button
-        onClick={onDecrement}
-        aria-label={`Remove one ${label}`}
-        className="w-8 h-8 rounded-full bg-white shadow-sm text-orange-600 text-lg font-bold flex items-center justify-center hover:bg-orange-100 active:scale-95 transition-transform"
-      >
-        −
-      </button>
-      <span className="min-w-[1.25rem] text-center text-sm font-bold text-slate-800 tabular-nums">{quantity}</span>
-      <button
-        onClick={onIncrement}
-        aria-label={`Add one more ${label}`}
-        className="w-8 h-8 rounded-full bg-white shadow-sm text-orange-600 text-lg font-bold flex items-center justify-center hover:bg-orange-100 active:scale-95 transition-transform"
-      >
-        +
-      </button>
+    <div className="flex flex-col items-end gap-0.5">
+      <div className="flex items-center gap-3 bg-orange-50 rounded-full pl-1 pr-1 py-1" aria-label={label}>
+        <button
+          onClick={onDecrement}
+          aria-label={`Remove one ${label}`}
+          className="w-8 h-8 rounded-full bg-white shadow-sm text-orange-600 text-lg font-bold flex items-center justify-center hover:bg-orange-100 active:scale-95 transition-transform"
+        >
+          −
+        </button>
+        <span className="min-w-[1.25rem] text-center text-sm font-bold text-slate-800 tabular-nums">{quantity}</span>
+        <button
+          onClick={onIncrement}
+          disabled={atMax}
+          aria-label={`Add one more ${label}`}
+          className="w-8 h-8 rounded-full bg-white shadow-sm text-orange-600 text-lg font-bold flex items-center justify-center hover:bg-orange-100 active:scale-95 transition-transform disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white"
+        >
+          +
+        </button>
+      </div>
+      {atMax && <span className="text-[10px] text-amber-600 font-medium pr-1">Max available</span>}
     </div>
   );
 }
@@ -108,6 +112,7 @@ function MenuItemCard({ item, vendorId, vendorName }) {
         vendorName,
         collectionStartTime: item.collectionStartTime || null,
         collectionEndTime: item.collectionEndTime || null,
+        maxQuantity: orderType === 'Direct' ? item.currentQuantity : item.nextBatchQuantity,
       })
     );
   };
@@ -141,7 +146,16 @@ function MenuItemCard({ item, vendorId, vendorName }) {
           ) : (
             <span className="text-red-500 font-medium">Sold out for now</span>
           )}
-          {item.canPrebook && ' · Pre-book open for next batch'}
+          {item.availableForPrebook && item.isPrebookOpen && (
+            <>
+              {' · '}
+              {item.nextBatchQuantity > 0 ? (
+                <span className="text-blue-600 font-medium">{item.nextBatchQuantity} left to pre-book</span>
+              ) : (
+                <span className="text-red-500 font-medium">Pre-book batch full</span>
+              )}
+            </>
+          )}
         </p>
         {item.availableForPrebook && (item.collectionStartTime || item.collectionEndTime) && (
           <p className="text-xs text-slate-400 mt-0.5">
@@ -158,6 +172,7 @@ function MenuItemCard({ item, vendorId, vendorName }) {
           <QuantityStepper
             label={`${item.itemName} (direct)`}
             quantity={directLine.quantity}
+            atMax={directLine.quantity >= item.currentQuantity}
             onIncrement={() => handleAdd('Direct')}
             onDecrement={() => handleDecrement(directLine)}
           />
@@ -175,6 +190,7 @@ function MenuItemCard({ item, vendorId, vendorName }) {
             <QuantityStepper
               label={`${item.itemName} (pre-book)`}
               quantity={prebookLine.quantity}
+              atMax={prebookLine.quantity >= item.nextBatchQuantity}
               onIncrement={() => handleAdd('Prebook')}
               onDecrement={() => handleDecrement(prebookLine)}
             />

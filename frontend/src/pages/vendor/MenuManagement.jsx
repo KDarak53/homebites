@@ -159,14 +159,14 @@ function PrebookWindowControl({ product }) {
       <p className={status.tone}>
         {status.icon} Pre-order window: {status.label} · next batch qty: {product.nextBatchQuantity}
       </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1.5 text-slate-500">
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-2">
+        <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5 text-slate-500">
           Opens
-          <input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} className="input py-1 text-xs" />
+          <input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} className="input py-1.5 sm:py-1 text-xs w-full sm:w-auto" />
         </label>
-        <label className="flex items-center gap-1.5 text-slate-500">
+        <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5 text-slate-500">
           Closes
-          <input type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} className="input py-1 text-xs" />
+          <input type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} className="input py-1.5 sm:py-1 text-xs w-full sm:w-auto" />
         </label>
         <button
           disabled={saving}
@@ -178,7 +178,7 @@ function PrebookWindowControl({ product }) {
               nextBatchQuantity: nextBatchQty,
             })
           }
-          className="btn-ghost text-xs px-2.5 py-1 bg-slate-100"
+          className="btn-ghost text-xs px-2.5 py-2 sm:py-1 bg-slate-100 w-full xs:col-span-2 sm:w-auto"
         >
           Set window
         </button>
@@ -187,33 +187,33 @@ function PrebookWindowControl({ product }) {
       <p className="text-slate-400 mt-1">
         🥡 Available to collect: <span className={collectFromDate || collectUntilDate ? 'text-slate-600 font-medium' : ''}>{collectionLabel}</span>
       </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1.5 text-slate-500">
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-2">
+        <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5 text-slate-500">
           Collect from
-          <input type="datetime-local" value={collectFrom} onChange={(e) => setCollectFrom(e.target.value)} className="input py-1 text-xs" />
+          <input type="datetime-local" value={collectFrom} onChange={(e) => setCollectFrom(e.target.value)} className="input py-1.5 sm:py-1 text-xs w-full sm:w-auto" />
         </label>
-        <label className="flex items-center gap-1.5 text-slate-500">
+        <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5 text-slate-500">
           Collect until
-          <input type="datetime-local" value={collectUntil} onChange={(e) => setCollectUntil(e.target.value)} className="input py-1 text-xs" />
+          <input type="datetime-local" value={collectUntil} onChange={(e) => setCollectUntil(e.target.value)} className="input py-1.5 sm:py-1 text-xs w-full sm:w-auto" />
         </label>
         <button
           disabled={saving}
           onClick={() => updateProduct({ id: product._id, collectionStartTime: localDatetimeToISO(collectFrom), collectionEndTime: localDatetimeToISO(collectUntil) })}
-          className="btn-ghost text-xs px-2.5 py-1 bg-slate-100"
+          className="btn-ghost text-xs px-2.5 py-2 sm:py-1 bg-slate-100 w-full xs:col-span-2 sm:w-auto"
         >
           Set collection time
         </button>
       </div>
 
-      <div className="flex items-center gap-2">
-        <label className="flex items-center gap-1.5 text-slate-500">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5 text-slate-500">
           Next batch qty
           <input
             type="number"
             min={0}
             value={nextBatchQty}
             onChange={(e) => setNextBatchQty(Number(e.target.value))}
-            className="input py-1 text-xs w-20"
+            className="input py-1.5 sm:py-1 text-xs w-24 sm:w-20"
           />
         </label>
         <button
