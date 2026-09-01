@@ -32,8 +32,23 @@ const registerUser = asyncHandler(async (req, res) => {
   // that's fine, they're independent identities.
   const exists = await User.findOne({ email, role: 'customer' });
   if (exists) {
-    res.status(400);
-    throw new Error('A customer account with this email already exists');
+    if (exists.isEmailVerified) {
+      res.status(400);
+      throw new Error('A customer account with this email already exists');
+    }
+    // An unverified duplicate almost always means the first email never
+    // arrived (or was missed) and they're retrying — a hard "already
+    // exists" here would be a dead end with no way forward. Treat it as a
+    // resend instead, refreshing their details in case they fixed a typo.
+    exists.name = name;
+    exists.phone = phone;
+    exists.password = password;
+    exists.location = { type: 'Point', coordinates: [longitude ?? 0, latitude ?? 0], address: address || '' };
+    await issueVerificationEmail(exists);
+    return res.status(201).json({
+      message: 'Account already pending verification — sent a fresh verification link.',
+      email: exists.email,
+    });
   }
 
   const user = await User.create({
@@ -81,8 +96,25 @@ const registerVendor = asyncHandler(async (req, res) => {
 
   const exists = await User.findOne({ email, role: 'vendor' });
   if (exists) {
-    res.status(400);
-    throw new Error('A vendor account with this email already exists');
+    if (exists.isEmailVerified) {
+      res.status(400);
+      throw new Error('A vendor account with this email already exists');
+    }
+    // Same reasoning as registerUser: an unverified duplicate means the
+    // first email likely never arrived — resend rather than dead-end.
+    exists.name = name;
+    exists.phone = phone;
+    exists.password = password;
+    exists.location = { type: 'Point', coordinates: [longitude, latitude], address: address || '' };
+    await VendorProfile.findOneAndUpdate(
+      { user: exists._id },
+      { businessName, fssaiLicense, kitchenLocation: { type: 'Point', coordinates: [longitude, latitude], address: address || '' } }
+    );
+    await issueVerificationEmail(exists);
+    return res.status(201).json({
+      message: 'Account already pending verification — sent a fresh verification link.',
+      email: exists.email,
+    });
   }
 
   const user = await User.create({
