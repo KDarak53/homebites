@@ -353,6 +353,7 @@ async function seed() {
       phone: c.phone,
       password: 'password123',
       role: 'customer',
+      isEmailVerified: true, // seeded accounts skip the real verification flow
       location: { type: 'Point', coordinates: coords, address },
     });
     customerCreds.push({ name: c.name, email: c.email });
@@ -366,6 +367,7 @@ async function seed() {
     phone: '9800000099',
     password: 'password123',
     role: 'admin',
+    isEmailVerified: true,
     location: { type: 'Point', coordinates: [BASE.longitude, BASE.latitude], address: `Admin, ${BASE.city}` },
   });
   console.log('\nCreated admin: admin@homebites.test / password123');
@@ -378,6 +380,7 @@ async function seed() {
       phone: '98' + String(Math.floor(10000000 + Math.random() * 89999999)),
       password: 'password123',
       role: 'vendor',
+      isEmailVerified: true,
       location: { type: 'Point', coordinates: v.coords, address: v.address },
     });
 

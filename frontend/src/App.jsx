@@ -8,6 +8,7 @@ import LoginVendor from './pages/LoginVendor';
 import LoginAdmin from './pages/LoginAdmin';
 import Register from './pages/Register';
 import RegisterVendor from './pages/RegisterVendor';
+import VerifyEmail from './pages/VerifyEmail';
 import Restaurants from './pages/Restaurants';
 import VendorMenu from './pages/VendorMenu';
 import Cart from './pages/Cart';
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/login-admin" element={<LoginAdmin />} />
         <Route path="/register" element={<Register />} />
         <Route path="/register-vendor" element={<RegisterVendor />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/vendors/:id" element={<VendorMenu />} />
 
         <Route

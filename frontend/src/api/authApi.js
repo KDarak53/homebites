@@ -14,6 +14,12 @@ export const authApi = apiSlice.injectEndpoints({
     registerVendor: builder.mutation({
       query: (data) => ({ url: '/auth/register-vendor', method: 'POST', body: data }),
     }),
+    verifyEmail: builder.mutation({
+      query: (token) => ({ url: '/auth/verify-email', method: 'POST', body: { token } }),
+    }),
+    resendVerification: builder.mutation({
+      query: (body) => ({ url: '/auth/resend-verification', method: 'POST', body }),
+    }),
     getMe: builder.query({
       query: () => '/auth/me',
       providesTags: ['Me'],
@@ -30,6 +36,8 @@ export const {
   useLoginVendorMutation,
   useRegisterCustomerMutation,
   useRegisterVendorMutation,
+  useVerifyEmailMutation,
+  useResendVerificationMutation,
   useGetMeQuery,
   useUpdateMeMutation,
 } = authApi;

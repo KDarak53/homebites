@@ -43,14 +43,15 @@ export default function Navbar() {
 
         {/* Desktop links — hidden below md, where the drawer takes over */}
         <div className="hidden md:flex items-center gap-5 text-sm font-medium">
+          {/* Vendor login/register are deliberately not linked here (or in the
+              mobile drawer below) — vendors reach /login-vendor and
+              /register-vendor by direct link, kept separate from the
+              customer-facing entry points rather than offered side by side. */}
           {!user && (
             <>
               <NavLink to="/login" className={linkClass}>Login</NavLink>
-              <NavLink to="/register" className={linkClass}>Sign up</NavLink>
-              <span className="text-slate-300">|</span>
-              <NavLink to="/login-vendor" className={linkClass}>Vendor login</NavLink>
-              <NavLink to="/register-vendor" className="btn-primary text-xs px-3.5 py-1.5">
-                Become a vendor
+              <NavLink to="/register" className="btn-primary text-xs px-3.5 py-1.5">
+                Sign up
               </NavLink>
             </>
           )}
@@ -122,10 +123,8 @@ export default function Navbar() {
           {!user && (
             <>
               <NavLink to="/login" onClick={closeMobile} className={mobileLinkClass}>Login</NavLink>
-              <NavLink to="/register" onClick={closeMobile} className={mobileLinkClass}>Sign up</NavLink>
-              <NavLink to="/login-vendor" onClick={closeMobile} className={mobileLinkClass}>Vendor login</NavLink>
-              <NavLink to="/register-vendor" onClick={closeMobile} className="btn-primary text-sm px-4 py-2.5 mt-2 justify-center">
-                Become a vendor
+              <NavLink to="/register" onClick={closeMobile} className="btn-primary text-sm px-4 py-2.5 mt-1 justify-center">
+                Sign up
               </NavLink>
             </>
           )}

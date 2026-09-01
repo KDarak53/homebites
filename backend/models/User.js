@@ -29,6 +29,14 @@ const userSchema = new mongoose.Schema(
       address: { type: String, default: '' },
     },
     isActive: { type: Boolean, default: true },
+
+    // Email verification — a fresh registration can't log in until this is
+    // true (see authController.loginUser/loginVendor). The token itself is
+    // never stored in the clear (only its hash), same reasoning as a
+    // password: a DB leak shouldn't hand out working verification links.
+    isEmailVerified: { type: Boolean, default: false },
+    emailVerificationTokenHash: { type: String, select: false },
+    emailVerificationExpires: { type: Date, select: false },
   },
   { timestamps: true }
 );
