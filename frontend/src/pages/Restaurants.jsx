@@ -116,7 +116,7 @@ export default function Restaurants() {
               step="0.0001"
               value={location.latitude}
               onChange={(e) => updateParams({ lat: e.target.value })}
-              className="input w-32 py-1.5"
+              className="input w-40 py-1.5"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -126,7 +126,7 @@ export default function Restaurants() {
               step="0.0001"
               value={location.longitude}
               onChange={(e) => updateParams({ lng: e.target.value })}
-              className="input w-32 py-1.5"
+              className="input w-40 py-1.5"
             />
           </label>
           <button onClick={() => updateParams({ lat: DEFAULT_LOCATION.latitude, lng: DEFAULT_LOCATION.longitude })} className="text-slate-500 underline">

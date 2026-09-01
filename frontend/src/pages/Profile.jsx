@@ -88,13 +88,13 @@ export default function Profile() {
         </label>
 
         <div className="flex gap-2">
-          <label className="text-sm flex flex-col gap-1 flex-1">
+          <label className="text-sm flex flex-col gap-1 flex-1 min-w-0">
             Latitude
-            <input type="number" step="0.0001" value={form.latitude} onChange={update('latitude')} className="input py-1.5" />
+            <input type="number" step="0.0001" value={form.latitude} onChange={update('latitude')} className="input py-1.5 w-full min-w-0" />
           </label>
-          <label className="text-sm flex flex-col gap-1 flex-1">
+          <label className="text-sm flex flex-col gap-1 flex-1 min-w-0">
             Longitude
-            <input type="number" step="0.0001" value={form.longitude} onChange={update('longitude')} className="input py-1.5" />
+            <input type="number" step="0.0001" value={form.longitude} onChange={update('longitude')} className="input py-1.5 w-full min-w-0" />
           </label>
         </div>
         {coords && (

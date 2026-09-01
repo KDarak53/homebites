@@ -200,24 +200,24 @@ export default function Cart() {
               className="input w-full text-sm"
             />
             <div className="flex gap-2">
-              <label className="flex flex-col gap-1 flex-1 text-xs text-slate-500">
+              <label className="flex flex-col gap-1 flex-1 min-w-0 text-xs text-slate-500">
                 Latitude
                 <input
                   type="number"
                   step="0.0001"
                   value={deliveryLocation.latitude}
                   onChange={(e) => setDeliveryLocation((l) => ({ ...l, latitude: Number(e.target.value) }))}
-                  className="input py-1 text-sm"
+                  className="input py-1 text-sm w-full min-w-0"
                 />
               </label>
-              <label className="flex flex-col gap-1 flex-1 text-xs text-slate-500">
+              <label className="flex flex-col gap-1 flex-1 min-w-0 text-xs text-slate-500">
                 Longitude
                 <input
                   type="number"
                   step="0.0001"
                   value={deliveryLocation.longitude}
                   onChange={(e) => setDeliveryLocation((l) => ({ ...l, longitude: Number(e.target.value) }))}
-                  className="input py-1 text-sm"
+                  className="input py-1 text-sm w-full min-w-0"
                 />
               </label>
             </div>

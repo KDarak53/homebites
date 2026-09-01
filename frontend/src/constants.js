@@ -1,7 +1,10 @@
 // Matches backend/utils/seed.js's BASE location, so the demo vendors show up
 // as "nearby" by default without requiring real browser geolocation to
 // happen to line up with wherever the seed data was generated.
-export const DEFAULT_LOCATION = { latitude: 12.573853983599701, longitude: 80.1385725280079 }; // Chennai
+// 6 decimal places is already sub-meter precision — the extra digits this
+// carried before just made every lat/lng input field longer than it needed
+// to be for no real benefit.
+export const DEFAULT_LOCATION = { latitude: 12.573854, longitude: 80.138573 }; // Chennai
 
 // Uploaded images are returned as paths like "/uploads/xyz.png" relative to
 // the API server (not the frontend dev server) — prefix with this to render them.

@@ -94,24 +94,24 @@ export default function RegisterVendor() {
           <input placeholder="Kitchen address" value={form.address} onChange={update('address')} className="input" />
 
           <div className="flex gap-2 text-sm">
-            <label className="flex flex-col gap-1 flex-1">
+            <label className="flex flex-col gap-1 flex-1 min-w-0">
               Kitchen latitude
               <input
                 type="number"
                 step="0.0001"
                 value={location.latitude}
                 onChange={(e) => setLocation((l) => ({ ...l, latitude: Number(e.target.value) }))}
-                className="input py-1.5"
+                className="input py-1.5 w-full min-w-0"
               />
             </label>
-            <label className="flex flex-col gap-1 flex-1">
+            <label className="flex flex-col gap-1 flex-1 min-w-0">
               Kitchen longitude
               <input
                 type="number"
                 step="0.0001"
                 value={location.longitude}
                 onChange={(e) => setLocation((l) => ({ ...l, longitude: Number(e.target.value) }))}
-                className="input py-1.5"
+                className="input py-1.5 w-full min-w-0"
               />
             </label>
           </div>
