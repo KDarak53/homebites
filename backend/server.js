@@ -12,6 +12,8 @@ const jwt = require('jsonwebtoken');
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const { runDailySubscriptionCycle } = require('./utils/subscriptionScheduler');
+const { isConfigured: emailConfigured } = require('./config/email');
+const { isConfigured: paymentsConfigured } = require('./config/payments');
 
 const authRoutes = require('./routes/authRoutes');
 const vendorRoutes = require('./routes/vendorRoutes');
@@ -65,7 +67,9 @@ if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+// Booleans only — never the actual credentials — so mock-vs-real mode for a
+// service is checkable without digging through host logs.
+app.get('/api/health', (req, res) => res.json({ status: 'ok', emailConfigured, paymentsConfigured }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
