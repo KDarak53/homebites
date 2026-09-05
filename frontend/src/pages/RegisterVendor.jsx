@@ -4,7 +4,7 @@ import { useRegisterVendorMutation, useResendVerificationMutation } from '../api
 import useGeolocation from '../hooks/useGeolocation';
 import { DEFAULT_LOCATION } from '../constants';
 
-function CheckYourEmail({ email }) {
+function CheckYourEmail({ email, onEditEmail }) {
   const [resendVerification, { isLoading, isSuccess }] = useResendVerificationMutation();
 
   return (
@@ -32,6 +32,12 @@ function CheckYourEmail({ email }) {
             {isLoading ? 'Sending...' : 'Resend email'}
           </button>
           {isSuccess && <span className="text-emerald-600"> · Sent!</span>}
+        </p>
+        <p className="text-xs text-slate-400 mt-1">
+          Typo in the address?{' '}
+          <button onClick={onEditEmail} className="text-orange-600 font-semibold hover:text-orange-700">
+            Edit email
+          </button>
         </p>
       </div>
     </div>
@@ -73,7 +79,7 @@ export default function RegisterVendor() {
     }
   };
 
-  if (registeredEmail) return <CheckYourEmail email={registeredEmail} />;
+  if (registeredEmail) return <CheckYourEmail email={registeredEmail} onEditEmail={() => setRegisteredEmail(null)} />;
 
   return (
     <div className="max-w-md mx-auto mt-10 px-4">
