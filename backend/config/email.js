@@ -18,26 +18,48 @@ if (isConfigured) {
 } else {
   console.warn(
     '[email] SENDGRID_API_KEY/SENDGRID_FROM not set — running in MOCK email mode. ' +
-      'Verification links will be printed to this console instead of emailed. Add real SendGrid creds to send actual email.'
+      'Emails will be printed to this console instead of sent. Add real SendGrid creds to send actual email.'
   );
 }
 
-async function sendVerificationEmail({ to, name, verifyUrl }) {
+async function send({ to, subject, text, html }) {
   if (!isConfigured) {
-    console.log(
-      `\n[email] MOCK verification email for ${to}:\n  Hi ${name}, verify your HomeBites account here:\n  ${verifyUrl}\n`
-    );
+    console.log(`\n[email] MOCK email for ${to}:\n  Subject: ${subject}\n  ${text}\n`);
     return { mock: true };
   }
 
-  await sgMail.send({
-    from: { email: process.env.SENDGRID_FROM, name: 'HomeBites' },
+  await sgMail.send({ from: { email: process.env.SENDGRID_FROM, name: 'HomeBites' }, to, subject, text, html });
+  return { mock: false };
+}
+
+function sendVerificationEmail({ to, name, verifyUrl }) {
+  return send({
     to,
     subject: 'Verify your HomeBites account',
     text: `Hi ${name},\n\nVerify your HomeBites account by opening this link:\n${verifyUrl}\n\nThis link expires in 24 hours.`,
     html: `<p>Hi ${name},</p><p>Verify your HomeBites account by clicking the link below:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p><p>This link expires in 24 hours.</p>`,
   });
-  return { mock: false };
 }
 
-module.exports = { isConfigured, sendVerificationEmail };
+// Sent when an admin approves or rejects a vendor's kitchen listing — the
+// in-app notification (services/notify.js) only reaches them if they happen
+// to be logged in at that moment, which after registering and waiting for
+// moderation they usually aren't.
+function sendVendorApprovalEmail({ to, name, businessName, approved, reason }) {
+  if (approved) {
+    return send({
+      to,
+      subject: `${businessName} is now live on HomeBites!`,
+      text: `Hi ${name},\n\nGreat news — ${businessName} has been approved and is now visible to customers on HomeBites.\n\nLog in to manage your menu and orders: ${process.env.CLIENT_URL || 'http://localhost:5173'}/login-vendor`,
+      html: `<p>Hi ${name},</p><p>Great news — <strong>${businessName}</strong> has been approved and is now visible to customers on HomeBites.</p><p><a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/login-vendor">Log in to manage your menu and orders</a></p>`,
+    });
+  }
+  return send({
+    to,
+    subject: `${businessName} needs attention before it can go live`,
+    text: `Hi ${name},\n\nYour kitchen listing for ${businessName} wasn't approved yet.\n\n${reason || 'Please check your FSSAI license and details.'}\n\nLog in to review and update: ${process.env.CLIENT_URL || 'http://localhost:5173'}/login-vendor`,
+    html: `<p>Hi ${name},</p><p>Your kitchen listing for <strong>${businessName}</strong> wasn't approved yet.</p><p>${reason || 'Please check your FSSAI license and details.'}</p><p><a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/login-vendor">Log in to review and update</a></p>`,
+  });
+}
+
+module.exports = { isConfigured, sendVerificationEmail, sendVendorApprovalEmail };

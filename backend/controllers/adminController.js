@@ -1,8 +1,10 @@
 const asyncHandler = require('express-async-handler');
+const User = require('../models/User');
 const VendorProfile = require('../models/VendorProfile');
 const PlatformSettings = require('../models/PlatformSettings');
 const Order = require('../models/Order');
 const { notify } = require('../services/notify');
+const { sendVendorApprovalEmail } = require('../config/email');
 
 // @desc  List vendors awaiting approval
 // @route GET /api/admin/vendors/pending
@@ -30,6 +32,17 @@ const approveVendor = asyncHandler(async (req, res) => {
     body: `${vendor.businessName} is now live and visible to customers.`,
   });
 
+  // Fire-and-forget, same reasoning as registration's verification email —
+  // an approval action shouldn't hang or fail on a slow/broken mail send,
+  // and the in-app notification above already covers the case where the
+  // vendor happens to be logged in right now.
+  const owner = await User.findById(vendor.user).select('name email');
+  if (owner) {
+    sendVendorApprovalEmail({ to: owner.email, name: owner.name, businessName: vendor.businessName, approved: true }).catch((err) =>
+      console.error(`[email] Failed to send approval email to ${owner.email}:`, err.message)
+    );
+  }
+
   res.json(vendor);
 });
 
@@ -52,6 +65,17 @@ const rejectVendor = asyncHandler(async (req, res) => {
     title: 'Kitchen application needs attention',
     body: req.body.reason || 'Your kitchen listing was not approved. Please check your FSSAI license and details.',
   });
+
+  const owner = await User.findById(vendor.user).select('name email');
+  if (owner) {
+    sendVendorApprovalEmail({
+      to: owner.email,
+      name: owner.name,
+      businessName: vendor.businessName,
+      approved: false,
+      reason: req.body.reason,
+    }).catch((err) => console.error(`[email] Failed to send rejection email to ${owner.email}:`, err.message));
+  }
 
   res.json(vendor);
 });
