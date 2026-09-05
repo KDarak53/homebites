@@ -3,6 +3,7 @@ const User = require('../models/User');
 const VendorProfile = require('../models/VendorProfile');
 const PlatformSettings = require('../models/PlatformSettings');
 const Order = require('../models/Order');
+const Product = require('../models/Product');
 const { notify } = require('../services/notify');
 const { sendVendorApprovalEmail, sendVendorSuspensionEmail } = require('../config/email');
 
@@ -12,6 +13,59 @@ const { sendVendorApprovalEmail, sendVendorSuspensionEmail } = require('../confi
 const getAllVendors = asyncHandler(async (req, res) => {
   const vendors = await VendorProfile.find({}).populate('user', 'name email phone').sort({ createdAt: -1 });
   res.json(vendors);
+});
+
+// @desc  Full drill-down on one vendor: their menu, per-item units sold and
+//        revenue, and platform-vs-vendor earnings — the admin's "open the
+//        restaurant and see everything" view.
+// @route GET /api/admin/vendors/:id/details
+const getVendorDetails = asyncHandler(async (req, res) => {
+  const vendor = await VendorProfile.findById(req.params.id).populate('user', 'name email phone');
+  if (!vendor) {
+    res.status(404);
+    throw new Error('Vendor not found');
+  }
+
+  const menu = await Product.find({ vendor: vendor._id }).sort({ createdAt: -1 });
+
+  // "Sold" is scoped to paid orders — same population the GMV/commission
+  // figures below are drawn from, so the item table and the totals agree
+  // with each other. (Matches getOverview's existing paymentStatus: 'paid'
+  // convention — a cancelled-after-payment order isn't excluded here any
+  // more than it is there, since refunds aren't modeled yet.)
+  const orders = await Order.find({ vendor: vendor._id, paymentStatus: 'paid' }).sort({ createdAt: -1 });
+
+  const itemStatsByProduct = {};
+  orders.forEach((order) => {
+    order.items.forEach((item) => {
+      const key = String(item.product);
+      if (!itemStatsByProduct[key]) {
+        itemStatsByProduct[key] = { productId: item.product, itemName: item.itemName, quantitySold: 0, revenue: 0 };
+      }
+      itemStatsByProduct[key].quantitySold += item.quantity;
+      itemStatsByProduct[key].revenue += item.unitPrice * item.quantity;
+    });
+  });
+  const itemStats = Object.values(itemStatsByProduct).sort((a, b) => b.quantitySold - a.quantitySold);
+
+  const completedOrders = orders.filter((o) => o.status === 'Completed');
+  const gmv = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+  const commissionCollected = orders.reduce((sum, o) => sum + o.platformCommissionAmount, 0);
+  const netPayout = completedOrders.reduce((sum, o) => sum + o.vendorPayoutAmount, 0);
+
+  res.json({
+    vendor,
+    menu,
+    itemStats,
+    earnings: {
+      totalOrders: orders.length,
+      completedOrders: completedOrders.length,
+      gmv,
+      commissionCollected,
+      netPayout,
+      avgOrderValue: orders.length ? Math.round(gmv / orders.length) : 0,
+    },
+  });
 });
 
 // @desc  List vendors awaiting approval (excludes ones already rejected —
@@ -217,6 +271,7 @@ const getOverview = asyncHandler(async (req, res) => {
 
 module.exports = {
   getAllVendors,
+  getVendorDetails,
   getPendingVendors,
   approveVendor,
   rejectVendor,

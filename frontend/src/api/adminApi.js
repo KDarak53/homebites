@@ -11,6 +11,13 @@ export const adminApi = apiSlice.injectEndpoints({
       query: () => '/admin/vendors',
       providesTags: VENDOR_LIST_TAGS,
     }),
+    getVendorDetails: builder.query({
+      query: (id) => `/admin/vendors/${id}/details`,
+      // Plain (not id-scoped) tag, matching VENDOR_LIST_TAGS below — so a
+      // suspend/approve/etc. on this vendor also refetches its open detail
+      // panel, not just the list views.
+      providesTags: VENDOR_LIST_TAGS,
+    }),
     getPendingVendors: builder.query({
       query: () => '/admin/vendors/pending',
       providesTags: VENDOR_LIST_TAGS,
@@ -48,6 +55,7 @@ export const adminApi = apiSlice.injectEndpoints({
 
 export const {
   useGetAllVendorsQuery,
+  useGetVendorDetailsQuery,
   useGetPendingVendorsQuery,
   useApproveVendorMutation,
   useRejectVendorMutation,
