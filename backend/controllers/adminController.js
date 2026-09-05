@@ -37,26 +37,27 @@ const approveVendor = asyncHandler(async (req, res) => {
   vendor.rejectedAt = null; // clears a prior rejection, in case this is a re-review
   await vendor.save();
 
+  // Respond as soon as the actual action (the thing the admin asked for) has
+  // succeeded — a downstream notify()/email failure must never turn a
+  // successful approval into an error response. This is exactly how a bad
+  // Notification enum value once did (see suspendVendor's history).
+  res.json(vendor);
+
   const io = req.app.get('io');
-  await notify(io, {
+  notify(io, {
     userId: vendor.user,
     type: 'vendor_approval',
     title: 'Your kitchen is approved!',
     body: `${vendor.businessName} is now live and visible to customers.`,
-  });
+  }).catch((err) => console.error('[notify] Failed to create vendor_approval notification:', err.message));
 
-  // Fire-and-forget, same reasoning as registration's verification email —
-  // an approval action shouldn't hang or fail on a slow/broken mail send,
-  // and the in-app notification above already covers the case where the
-  // vendor happens to be logged in right now.
-  const owner = await User.findById(vendor.user).select('name email');
-  if (owner) {
-    sendVendorApprovalEmail({ to: owner.email, name: owner.name, businessName: vendor.businessName, approved: true }).catch((err) =>
-      console.error(`[email] Failed to send approval email to ${owner.email}:`, err.message)
-    );
-  }
-
-  res.json(vendor);
+  User.findById(vendor.user)
+    .select('name email')
+    .then((owner) => {
+      if (!owner) return;
+      return sendVendorApprovalEmail({ to: owner.email, name: owner.name, businessName: vendor.businessName, approved: true });
+    })
+    .catch((err) => console.error('[email] Failed to send approval email:', err.message));
 });
 
 // @desc  Reject a vendor's application (kept in the system, just not approved)
@@ -72,26 +73,29 @@ const rejectVendor = asyncHandler(async (req, res) => {
   vendor.rejectedAt = new Date();
   await vendor.save();
 
+  res.json(vendor);
+
   const io = req.app.get('io');
-  await notify(io, {
+  notify(io, {
     userId: vendor.user,
     type: 'vendor_approval',
     title: 'Kitchen application needs attention',
     body: req.body.reason || 'Your kitchen listing was not approved. Please check your FSSAI license and details.',
-  });
+  }).catch((err) => console.error('[notify] Failed to create vendor_approval notification:', err.message));
 
-  const owner = await User.findById(vendor.user).select('name email');
-  if (owner) {
-    sendVendorApprovalEmail({
-      to: owner.email,
-      name: owner.name,
-      businessName: vendor.businessName,
-      approved: false,
-      reason: req.body.reason,
-    }).catch((err) => console.error(`[email] Failed to send rejection email to ${owner.email}:`, err.message));
-  }
-
-  res.json(vendor);
+  User.findById(vendor.user)
+    .select('name email')
+    .then((owner) => {
+      if (!owner) return;
+      return sendVendorApprovalEmail({
+        to: owner.email,
+        name: owner.name,
+        businessName: vendor.businessName,
+        approved: false,
+        reason: req.body.reason,
+      });
+    })
+    .catch((err) => console.error('[email] Failed to send rejection email:', err.message));
 });
 
 // @desc  Pause an already-approved vendor at any point — separate override
@@ -108,26 +112,29 @@ const suspendVendor = asyncHandler(async (req, res) => {
   vendor.suspensionReason = req.body.reason || '';
   await vendor.save();
 
+  res.json(vendor);
+
   const io = req.app.get('io');
-  await notify(io, {
+  notify(io, {
     userId: vendor.user,
     type: 'vendor_suspension',
     title: 'Your kitchen has been paused',
     body: req.body.reason || `${vendor.businessName} has been paused by HomeBites.`,
-  });
+  }).catch((err) => console.error('[notify] Failed to create vendor_suspension notification:', err.message));
 
-  const owner = await User.findById(vendor.user).select('name email');
-  if (owner) {
-    sendVendorSuspensionEmail({
-      to: owner.email,
-      name: owner.name,
-      businessName: vendor.businessName,
-      suspended: true,
-      reason: req.body.reason,
-    }).catch((err) => console.error(`[email] Failed to send suspension email to ${owner.email}:`, err.message));
-  }
-
-  res.json(vendor);
+  User.findById(vendor.user)
+    .select('name email')
+    .then((owner) => {
+      if (!owner) return;
+      return sendVendorSuspensionEmail({
+        to: owner.email,
+        name: owner.name,
+        businessName: vendor.businessName,
+        suspended: true,
+        reason: req.body.reason,
+      });
+    })
+    .catch((err) => console.error('[email] Failed to send suspension email:', err.message));
 });
 
 // @desc  Resume a previously-paused vendor
@@ -142,22 +149,23 @@ const unsuspendVendor = asyncHandler(async (req, res) => {
   vendor.suspensionReason = '';
   await vendor.save();
 
+  res.json(vendor);
+
   const io = req.app.get('io');
-  await notify(io, {
+  notify(io, {
     userId: vendor.user,
     type: 'vendor_suspension',
     title: 'Your kitchen is active again',
     body: `${vendor.businessName} has been resumed and is visible to customers again.`,
-  });
+  }).catch((err) => console.error('[notify] Failed to create vendor_suspension notification:', err.message));
 
-  const owner = await User.findById(vendor.user).select('name email');
-  if (owner) {
-    sendVendorSuspensionEmail({ to: owner.email, name: owner.name, businessName: vendor.businessName, suspended: false }).catch((err) =>
-      console.error(`[email] Failed to send resume email to ${owner.email}:`, err.message)
-    );
-  }
-
-  res.json(vendor);
+  User.findById(vendor.user)
+    .select('name email')
+    .then((owner) => {
+      if (!owner) return;
+      return sendVendorSuspensionEmail({ to: owner.email, name: owner.name, businessName: vendor.businessName, suspended: false });
+    })
+    .catch((err) => console.error('[email] Failed to send resume email:', err.message));
 });
 
 // @desc  Read platform-wide settings (delivery rollout, commission rates)

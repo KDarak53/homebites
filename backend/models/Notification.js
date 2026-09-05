@@ -10,7 +10,7 @@ const notificationSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     type: {
       type: String,
-      enum: ['order_status', 'new_order', 'subscription', 'vendor_approval', 'general'],
+      enum: ['order_status', 'new_order', 'subscription', 'vendor_approval', 'vendor_suspension', 'general'],
       default: 'general',
     },
     title: { type: String, required: true },
