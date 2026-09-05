@@ -88,7 +88,9 @@ app.get('/api/health/test-email', async (req, res) => {
     const result = await sendVerificationEmail({ to, name: 'Test', verifyUrl: 'https://example.com/verify-email?token=test' });
     res.json({ ok: true, result });
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message, code: err.code });
+    // SendGrid (and similar HTTP-API providers) put the actually-useful
+    // detail in the response body, not err.message — surface that too.
+    res.status(500).json({ ok: false, error: err.message, code: err.code, details: err.response?.body });
   }
 });
 
