@@ -38,6 +38,18 @@ const vendorProfileSchema = new mongoose.Schema(
     // eventually accepted.
     rejectedAt: { type: Date, default: null },
 
+    // "Please fix X and resubmit" — a softer, constructive alternative to
+    // outright rejection during onboarding review. Distinct from rejectedAt:
+    // this keeps the vendor in the same pending pool (still isApproved:
+    // false, rejectedAt: null) rather than marking them rejected, and
+    // carries specific feedback the vendor's own dashboard can surface.
+    // reason/At are kept as history even after resubmission (not cleared),
+    // so the admin can still see what was originally asked for; resubmittedAt
+    // tells them whether the vendor has acted on it since.
+    changesRequestedReason: { type: String, default: '' },
+    changesRequestedAt: { type: Date, default: null },
+    resubmittedAt: { type: Date, default: null },
+
     // A platform-level override, separate from the vendor's own `isOpen`
     // toggle (Settings) — if these were the same field, a vendor the admin
     // paused could just flip their own kitchen back "open" and undo it.

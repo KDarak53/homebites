@@ -5,6 +5,7 @@ import {
   useGetPendingVendorsQuery,
   useApproveVendorMutation,
   useRejectVendorMutation,
+  useRequestVendorChangesMutation,
   useSuspendVendorMutation,
   useUnsuspendVendorMutation,
   useGetAdminSettingsQuery,
@@ -30,6 +31,16 @@ function Toggle({ checked, onChange }) {
 function PendingVendorCard({ vendor }) {
   const [approveVendor, { isLoading: approving }] = useApproveVendorMutation();
   const [rejectVendor, { isLoading: rejecting }] = useRejectVendorMutation();
+  const [requestChanges, { isLoading: requesting }] = useRequestVendorChangesMutation();
+  const busy = approving || rejecting || requesting;
+
+  const resubmitted = vendor.resubmittedAt && new Date(vendor.resubmittedAt) > new Date(vendor.changesRequestedAt);
+
+  const handleRequestChanges = () => {
+    const reason = window.prompt(`What does ${vendor.businessName} need to fix before approval? (shown to the vendor)`);
+    if (!reason) return; // cancelled or left blank — nothing constructive to send
+    requestChanges({ id: vendor._id, reason });
+  };
 
   return (
     <div className="card p-4">
@@ -39,12 +50,24 @@ function PendingVendorCard({ vendor }) {
           <p className="text-xs text-slate-500">{vendor.user?.name} &middot; {vendor.user?.email} &middot; {vendor.user?.phone}</p>
           <p className="text-xs text-slate-500 mt-1">🛡️ FSSAI: {vendor.fssaiLicense}</p>
           {vendor.kitchenLocation?.address && <p className="text-xs text-slate-400">📍 {vendor.kitchenLocation.address}</p>}
+          {vendor.changesRequestedReason && (
+            <p className={`text-xs mt-2 rounded-lg px-2 py-1.5 ${resubmitted ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
+              {resubmitted ? '🔄 Vendor resubmitted after changes.' : '✏️ Awaiting vendor changes.'} Asked: "{vendor.changesRequestedReason}"
+            </p>
+          )}
         </div>
         <div className="flex gap-2 shrink-0">
-          <button disabled={approving} onClick={() => approveVendor(vendor._id)} className="btn-primary text-xs px-3 py-1.5">
+          <button disabled={busy} onClick={() => approveVendor(vendor._id)} className="btn-primary text-xs px-3 py-1.5">
             Approve
           </button>
-          <button disabled={rejecting} onClick={() => rejectVendor({ id: vendor._id })} className="text-xs px-3 py-1.5 rounded-full bg-red-50 text-red-600 hover:bg-red-100 font-semibold">
+          <button
+            disabled={busy}
+            onClick={handleRequestChanges}
+            className="text-xs px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 font-semibold"
+          >
+            Request changes
+          </button>
+          <button disabled={busy} onClick={() => rejectVendor({ id: vendor._id })} className="text-xs px-3 py-1.5 rounded-full bg-red-50 text-red-600 hover:bg-red-100 font-semibold">
             Reject
           </button>
         </div>

@@ -90,7 +90,7 @@ const updateFulfillmentSettings = asyncHandler(async (req, res) => {
     throw new Error('Vendor profile not found');
   }
 
-  const { deliveryEnabled, maxDeliveryRadiusKm, deliveryFee, isOpen, businessName, description, kitchenPhotoUrl } = req.body;
+  const { deliveryEnabled, maxDeliveryRadiusKm, deliveryFee, isOpen, businessName, description, kitchenPhotoUrl, fssaiLicense } = req.body;
 
   if (deliveryEnabled !== undefined) vendor.deliveryEnabled = deliveryEnabled;
   if (maxDeliveryRadiusKm !== undefined) vendor.maxDeliveryRadiusKm = maxDeliveryRadiusKm;
@@ -99,7 +99,32 @@ const updateFulfillmentSettings = asyncHandler(async (req, res) => {
   if (businessName !== undefined) vendor.businessName = businessName;
   if (description !== undefined) vendor.description = description;
   if (kitchenPhotoUrl !== undefined) vendor.kitchenPhotoUrl = kitchenPhotoUrl;
+  // Wasn't editable before — but a vendor asked to fix onboarding details
+  // (see resubmitForApproval) has no way to correct a typo'd license number
+  // without this.
+  if (fssaiLicense !== undefined) vendor.fssaiLicense = fssaiLicense;
 
+  await vendor.save();
+  res.json(vendor);
+});
+
+// @desc  Vendor confirms they've made the changes an admin asked for and
+//        wants another review — leaves isApproved untouched (still needs an
+//        actual admin decision), just timestamps the resubmission so the
+//        pending queue can show "vendor has responded" vs "still waiting".
+// @route POST /api/vendors/me/resubmit
+const resubmitForApproval = asyncHandler(async (req, res) => {
+  const vendor = await VendorProfile.findOne({ user: req.user._id });
+  if (!vendor) {
+    res.status(404);
+    throw new Error('Vendor profile not found');
+  }
+  if (!vendor.changesRequestedReason) {
+    res.status(400);
+    throw new Error('No changes were requested for this kitchen');
+  }
+
+  vendor.resubmittedAt = new Date();
   await vendor.save();
   res.json(vendor);
 });
@@ -180,6 +205,7 @@ module.exports = {
   getVendorById,
   getMyVendorProfile,
   updateFulfillmentSettings,
+  resubmitForApproval,
   getVendorAnalytics,
   initiateUpgrade,
   confirmUpgrade,

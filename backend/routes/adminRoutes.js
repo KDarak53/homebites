@@ -6,6 +6,7 @@ const {
   getPendingVendors,
   approveVendor,
   rejectVendor,
+  requestVendorChanges,
   suspendVendor,
   unsuspendVendor,
   getSettings,
@@ -24,6 +25,7 @@ router.get('/vendors/:id/details', getVendorDetails);
 router.get('/vendors/:vendorId/items/:productId/history', getItemHistory);
 router.post('/vendors/:id/approve', approveVendor);
 router.post('/vendors/:id/reject', rejectVendor);
+router.post('/vendors/:id/request-changes', requestVendorChanges);
 router.post('/vendors/:id/suspend', suspendVendor);
 router.post('/vendors/:id/unsuspend', unsuspendVendor);
 router.get('/settings', getSettings);

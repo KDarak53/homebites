@@ -82,4 +82,22 @@ function sendVendorSuspensionEmail({ to, name, businessName, suspended, reason }
   });
 }
 
-module.exports = { isConfigured, sendVerificationEmail, sendVendorApprovalEmail, sendVendorSuspensionEmail };
+// Sent when an admin asks a vendor to fix something during onboarding
+// review, without rejecting them outright — a constructive middle ground
+// between "approved" and "rejected" (see VendorProfile.changesRequestedReason).
+function sendVendorChangesRequestedEmail({ to, name, businessName, reason }) {
+  return send({
+    to,
+    subject: `Action needed on your ${businessName} application`,
+    text: `Hi ${name},\n\nBefore we can approve ${businessName}, please fix the following:\n\n${reason}\n\nUpdate your details and resubmit for review: ${process.env.CLIENT_URL || 'http://localhost:5173'}/vendor/settings`,
+    html: `<p>Hi ${name},</p><p>Before we can approve <strong>${businessName}</strong>, please fix the following:</p><p>${reason}</p><p><a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/vendor/settings">Update your details and resubmit for review</a></p>`,
+  });
+}
+
+module.exports = {
+  isConfigured,
+  sendVerificationEmail,
+  sendVendorApprovalEmail,
+  sendVendorSuspensionEmail,
+  sendVendorChangesRequestedEmail,
+};

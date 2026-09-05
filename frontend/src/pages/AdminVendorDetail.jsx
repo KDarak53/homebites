@@ -5,6 +5,7 @@ import {
   useGetItemHistoryQuery,
   useApproveVendorMutation,
   useRejectVendorMutation,
+  useRequestVendorChangesMutation,
   useSuspendVendorMutation,
   useUnsuspendVendorMutation,
 } from '../api/adminApi';
@@ -90,6 +91,7 @@ export default function AdminVendorDetail() {
   const { data, isLoading, error } = useGetVendorDetailsQuery(id);
   const [approveVendor, { isLoading: approving }] = useApproveVendorMutation();
   const [rejectVendor, { isLoading: rejecting }] = useRejectVendorMutation();
+  const [requestChanges, { isLoading: requesting }] = useRequestVendorChangesMutation();
   const [suspendVendor, { isLoading: suspending }] = useSuspendVendorMutation();
   const [unsuspendVendor, { isLoading: resuming }] = useUnsuspendVendorMutation();
   const [expandedItem, setExpandedItem] = useState(null);
@@ -100,12 +102,19 @@ export default function AdminVendorDetail() {
   const { vendor, menu, itemStats, earnings } = data;
   const revenueByProduct = Object.fromEntries(itemStats.map((s) => [String(s.productId), s]));
   const status = vendorStatus(vendor);
-  const busy = approving || rejecting || suspending || resuming;
+  const busy = approving || rejecting || requesting || suspending || resuming;
+  const resubmitted = vendor.resubmittedAt && new Date(vendor.resubmittedAt) > new Date(vendor.changesRequestedAt);
 
   const handlePause = () => {
     const reason = window.prompt(`Reason for pausing ${vendor.businessName}? (shown to the vendor, optional)`);
     if (reason === null) return; // cancelled
     suspendVendor({ id: vendor._id, reason });
+  };
+
+  const handleRequestChanges = () => {
+    const reason = window.prompt(`What does ${vendor.businessName} need to fix before approval? (shown to the vendor)`);
+    if (!reason) return;
+    requestChanges({ id: vendor._id, reason });
   };
 
   return (
@@ -136,6 +145,11 @@ export default function AdminVendorDetail() {
             {vendor.isSuspendedByAdmin && vendor.suspensionReason && (
               <p className="text-xs text-red-600 mt-2 bg-red-50 rounded-lg px-2 py-1 inline-block">Suspension reason: {vendor.suspensionReason}</p>
             )}
+            {vendor.changesRequestedReason && !vendor.isApproved && (
+              <p className={`text-xs mt-2 rounded-lg px-2 py-1.5 inline-block ${resubmitted ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
+                {resubmitted ? '🔄 Vendor resubmitted after changes.' : '✏️ Awaiting vendor changes.'} Asked: "{vendor.changesRequestedReason}"
+              </p>
+            )}
           </div>
           <div className="flex gap-2 shrink-0">
             {vendor.isSuspendedByAdmin ? (
@@ -154,6 +168,13 @@ export default function AdminVendorDetail() {
               <>
                 <button disabled={busy} onClick={() => approveVendor(vendor._id)} className="btn-primary text-sm px-3.5 py-1.5">
                   Approve
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={handleRequestChanges}
+                  className="text-sm px-3.5 py-1.5 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 font-semibold"
+                >
+                  Request changes
                 </button>
                 <button
                   disabled={busy}

@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useGetVendorDashboardQuery, useUpdateOrderStatusMutation } from '../../api/orderApi';
-import { useGetMyVendorProfileQuery, useGetVendorAnalyticsQuery } from '../../api/vendorApi';
+import { useGetMyVendorProfileQuery, useGetVendorAnalyticsQuery, useResubmitForApprovalMutation } from '../../api/vendorApi';
 import { connectSocket } from '../../api/socket';
 import { apiSlice } from '../../api/apiSlice';
 import PickupScanner from '../../components/PickupScanner';
@@ -77,8 +78,12 @@ export default function VendorDashboard() {
   const { data: profile } = useGetMyVendorProfileQuery();
   const { data: dashboard, isLoading } = useGetVendorDashboardQuery();
   const { data: analytics } = useGetVendorAnalyticsQuery('weekly');
+  const [resubmitForApproval, { isLoading: resubmitting }] = useResubmitForApprovalMutation();
   const { token } = useSelector((s) => s.auth);
   const dispatch = useDispatch();
+
+  const resubmitted =
+    profile?.resubmittedAt && profile?.changesRequestedAt && new Date(profile.resubmittedAt) > new Date(profile.changesRequestedAt);
 
   useEffect(() => {
     if (!token || !profile?._id) return;
@@ -100,10 +105,36 @@ export default function VendorDashboard() {
         {profile?.businessName} {profile?.subscriptionPlan === 'pro' && <span className="badge-amber ml-1">⭐ Pro</span>}
       </p>
 
-      {profile && !profile.isApproved && (
+      {profile && !profile.isApproved && !profile.changesRequestedReason && (
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
           ⏳ Your kitchen is awaiting admin approval — it won't appear in customer search or be able to take orders until approved.
         </p>
+      )}
+
+      {profile && !profile.isApproved && profile.changesRequestedReason && (
+        <div className="text-sm bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+          {resubmitted ? (
+            <p className="text-blue-800">🔄 You resubmitted your changes — waiting for HomeBites to review again.</p>
+          ) : (
+            <>
+              <p className="text-amber-800 mb-2">
+                ✏️ HomeBites asked for a change before approving your kitchen: <span className="font-medium">"{profile.changesRequestedReason}"</span>
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                <Link to="/vendor/settings" className="btn-primary text-xs px-3 py-1.5">
+                  Update your details
+                </Link>
+                <button
+                  onClick={() => resubmitForApproval()}
+                  disabled={resubmitting}
+                  className="text-xs px-3 py-1.5 rounded-full bg-white border border-amber-300 text-amber-700 hover:bg-amber-100 font-semibold disabled:opacity-50"
+                >
+                  {resubmitting ? 'Submitting...' : "I've made the changes — resubmit"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {profile?.isSuspendedByAdmin && (

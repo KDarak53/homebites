@@ -5,7 +5,7 @@ const PlatformSettings = require('../models/PlatformSettings');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { notify } = require('../services/notify');
-const { sendVendorApprovalEmail, sendVendorSuspensionEmail } = require('../config/email');
+const { sendVendorApprovalEmail, sendVendorSuspensionEmail, sendVendorChangesRequestedEmail } = require('../config/email');
 
 // @desc  List every vendor, any status — the full oversight view (pending
 //        queue below is just the "needs a first decision" subset of this)
@@ -213,6 +213,48 @@ const rejectVendor = asyncHandler(async (req, res) => {
     .catch((err) => console.error('[email] Failed to send rejection email:', err.message));
 });
 
+// @desc  Ask a vendor to fix something during onboarding review, without
+//        rejecting them outright — stays in the same pending pool (not
+//        rejectedAt) so a resubmission naturally comes back up for review.
+// @route POST /api/admin/vendors/:id/request-changes
+const requestVendorChanges = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+  if (!reason) {
+    res.status(400);
+    throw new Error('reason is required — the vendor needs to know what to fix');
+  }
+
+  const vendor = await VendorProfile.findById(req.params.id);
+  if (!vendor) {
+    res.status(404);
+    throw new Error('Vendor not found');
+  }
+
+  vendor.isApproved = false;
+  vendor.rejectedAt = null; // a request for changes is not a rejection
+  vendor.changesRequestedReason = reason;
+  vendor.changesRequestedAt = new Date();
+  await vendor.save();
+
+  res.json(vendor);
+
+  const io = req.app.get('io');
+  notify(io, {
+    userId: vendor.user,
+    type: 'vendor_approval',
+    title: 'Changes requested for your kitchen',
+    body: reason,
+  }).catch((err) => console.error('[notify] Failed to create changes-requested notification:', err.message));
+
+  User.findById(vendor.user)
+    .select('name email')
+    .then((owner) => {
+      if (!owner) return;
+      return sendVendorChangesRequestedEmail({ to: owner.email, name: owner.name, businessName: vendor.businessName, reason });
+    })
+    .catch((err) => console.error('[email] Failed to send changes-requested email:', err.message));
+});
+
 // @desc  Pause an already-approved vendor at any point — separate override
 //        from approve/reject, and from the vendor's own isOpen toggle (which
 //        they'd otherwise just be able to flip back themselves)
@@ -337,6 +379,7 @@ module.exports = {
   getPendingVendors,
   approveVendor,
   rejectVendor,
+  requestVendorChanges,
   suspendVendor,
   unsuspendVendor,
   getSettings,

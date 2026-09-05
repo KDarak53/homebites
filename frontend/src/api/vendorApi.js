@@ -21,6 +21,10 @@ export const vendorApi = apiSlice.injectEndpoints({
       query: (body) => ({ url: '/vendors/me/settings', method: 'PATCH', body }),
       invalidatesTags: ['VendorProfile'],
     }),
+    resubmitForApproval: builder.mutation({
+      query: () => ({ url: '/vendors/me/resubmit', method: 'POST' }),
+      invalidatesTags: ['VendorProfile'],
+    }),
     getVendorAnalytics: builder.query({
       query: (range) => ({ url: '/vendors/me/analytics', params: { range } }),
       providesTags: ['Order'],
@@ -40,6 +44,7 @@ export const {
   useGetVendorByIdQuery,
   useGetMyVendorProfileQuery,
   useUpdateFulfillmentSettingsMutation,
+  useResubmitForApprovalMutation,
   useGetVendorAnalyticsQuery,
   useInitiateProUpgradeMutation,
   useConfirmProUpgradeMutation,

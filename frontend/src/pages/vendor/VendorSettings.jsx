@@ -84,6 +84,9 @@ export default function VendorSettings() {
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [isOpen, setIsOpen] = useState(true);
   const [kitchenPhotoUrl, setKitchenPhotoUrl] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [description, setDescription] = useState('');
+  const [fssaiLicense, setFssaiLicense] = useState('');
 
   useEffect(() => {
     if (!profile) return;
@@ -92,17 +95,43 @@ export default function VendorSettings() {
     setDeliveryFee(profile.deliveryFee);
     setIsOpen(profile.isOpen);
     setKitchenPhotoUrl(profile.kitchenPhotoUrl || '');
+    setBusinessName(profile.businessName || '');
+    setDescription(profile.description || '');
+    setFssaiLicense(profile.fssaiLicense || '');
   }, [profile]);
 
   if (isLoading || !profile) return <p className="p-4 text-slate-500">Loading settings...</p>;
 
-  const handleSave = () => update({ deliveryEnabled, maxDeliveryRadiusKm, deliveryFee, isOpen });
+  const handleSave = () => update({ deliveryEnabled, maxDeliveryRadiusKm, deliveryFee, isOpen, businessName, description, fssaiLicense });
 
   return (
     <div className="max-w-md mx-auto p-4">
       <h1 className="text-2xl font-bold text-slate-800 mb-4">⚙️ Fulfillment settings</h1>
 
       <ProUpgradeCard profile={profile} />
+
+      {profile.changesRequestedReason && !profile.isApproved && (
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-6">
+          ✏️ HomeBites asked you to fix: <span className="font-medium">"{profile.changesRequestedReason}"</span> — update the
+          relevant details below, then resubmit from your dashboard.
+        </p>
+      )}
+
+      <div className="card p-6 mb-6 flex flex-col gap-3">
+        <h2 className="font-semibold text-slate-800 mb-1">🏷️ Kitchen details</h2>
+        <label className="text-sm flex flex-col gap-1">
+          Business name
+          <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="input" />
+        </label>
+        <label className="text-sm flex flex-col gap-1">
+          FSSAI license number
+          <input value={fssaiLicense} onChange={(e) => setFssaiLicense(e.target.value)} className="input" />
+        </label>
+        <label className="text-sm flex flex-col gap-1">
+          Description
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="input resize-none" />
+        </label>
+      </div>
 
       <div className="card p-6 mb-6">
         <h2 className="font-semibold text-slate-800 mb-3">📷 Kitchen photo</h2>

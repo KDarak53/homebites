@@ -34,6 +34,10 @@ export const adminApi = apiSlice.injectEndpoints({
       query: ({ id, reason }) => ({ url: `/admin/vendors/${id}/reject`, method: 'POST', body: { reason } }),
       invalidatesTags: VENDOR_LIST_TAGS,
     }),
+    requestVendorChanges: builder.mutation({
+      query: ({ id, reason }) => ({ url: `/admin/vendors/${id}/request-changes`, method: 'POST', body: { reason } }),
+      invalidatesTags: VENDOR_LIST_TAGS,
+    }),
     suspendVendor: builder.mutation({
       query: ({ id, reason }) => ({ url: `/admin/vendors/${id}/suspend`, method: 'POST', body: { reason } }),
       invalidatesTags: VENDOR_LIST_TAGS,
@@ -64,6 +68,7 @@ export const {
   useGetPendingVendorsQuery,
   useApproveVendorMutation,
   useRejectVendorMutation,
+  useRequestVendorChangesMutation,
   useSuspendVendorMutation,
   useUnsuspendVendorMutation,
   useGetAdminSettingsQuery,

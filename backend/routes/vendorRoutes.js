@@ -4,6 +4,7 @@ const {
   getVendorById,
   getMyVendorProfile,
   updateFulfillmentSettings,
+  resubmitForApproval,
   getVendorAnalytics,
   initiateUpgrade,
   confirmUpgrade,
@@ -15,6 +16,7 @@ const router = express.Router();
 router.get('/', getNearbyVendors);
 router.get('/me/profile', protect, requireRole('vendor'), getMyVendorProfile);
 router.patch('/me/settings', protect, requireRole('vendor'), updateFulfillmentSettings);
+router.post('/me/resubmit', protect, requireRole('vendor'), resubmitForApproval);
 router.get('/me/analytics', protect, requireRole('vendor'), getVendorAnalytics);
 router.post('/me/upgrade/initiate', protect, requireRole('vendor'), initiateUpgrade);
 router.post('/me/upgrade/confirm', protect, requireRole('vendor'), confirmUpgrade);
