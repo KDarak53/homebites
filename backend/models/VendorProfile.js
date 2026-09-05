@@ -31,6 +31,12 @@ const vendorProfileSchema = new mongoose.Schema(
     // or being able to receive orders.
     isApproved: { type: Boolean, default: false },
     isOpen: { type: Boolean, default: true },
+    // Distinguishes "explicitly rejected" from "not yet reviewed" — both
+    // otherwise look identical (isApproved: false), which meant a rejected
+    // vendor never left the admin's pending-approval queue. Cleared back to
+    // null on a later approval, in case a re-submitted application is
+    // eventually accepted.
+    rejectedAt: { type: Date, default: null },
 
     // Optional paid tier: a lower per-order commission in exchange for a
     // flat monthly fee, plus priority placement — a second, volume-independent

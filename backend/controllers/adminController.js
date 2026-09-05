@@ -6,10 +6,14 @@ const Order = require('../models/Order');
 const { notify } = require('../services/notify');
 const { sendVendorApprovalEmail } = require('../config/email');
 
-// @desc  List vendors awaiting approval
+// @desc  List vendors awaiting approval (excludes ones already rejected —
+//        otherwise a rejected vendor looks identical to a fresh, never-
+//        reviewed one and never leaves this queue)
 // @route GET /api/admin/vendors/pending
 const getPendingVendors = asyncHandler(async (req, res) => {
-  const vendors = await VendorProfile.find({ isApproved: false }).populate('user', 'name email phone').sort({ createdAt: 1 });
+  const vendors = await VendorProfile.find({ isApproved: false, rejectedAt: null })
+    .populate('user', 'name email phone')
+    .sort({ createdAt: 1 });
   res.json(vendors);
 });
 
@@ -22,6 +26,7 @@ const approveVendor = asyncHandler(async (req, res) => {
     throw new Error('Vendor not found');
   }
   vendor.isApproved = true;
+  vendor.rejectedAt = null; // clears a prior rejection, in case this is a re-review
   await vendor.save();
 
   const io = req.app.get('io');
@@ -56,6 +61,7 @@ const rejectVendor = asyncHandler(async (req, res) => {
   }
   vendor.isApproved = false;
   vendor.isOpen = false;
+  vendor.rejectedAt = new Date();
   await vendor.save();
 
   const io = req.app.get('io');
