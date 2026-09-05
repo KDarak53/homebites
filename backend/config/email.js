@@ -12,10 +12,17 @@ const transporter = isConfigured
       port: Number(process.env.SMTP_PORT) || 587,
       secure: Number(process.env.SMTP_PORT) === 465,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-      // Some hosts (Render included) block outbound SMTP ports outright, in
-      // which case the connection just hangs rather than refusing cleanly —
-      // these caps make that fail loud in ~15s instead of hanging for
-      // minutes (Node's own default is effectively "forever").
+      // Many hosts (Render confirmed included, via /api/health/test-email:
+      // "connect ENETUNREACH <ipv6>:587") have no outbound IPv6 route at
+      // all, but Node's DNS resolver still hands back the AAAA (IPv6)
+      // record first — the connection then dies on a network the host
+      // genuinely can't route, nothing to do with the SMTP credentials.
+      // Forcing IPv4 sidesteps it entirely.
+      family: 4,
+      // Some hosts block outbound SMTP ports outright, in which case the
+      // connection just hangs rather than refusing cleanly — these caps
+      // make that fail loud in ~15s instead of hanging for minutes (Node's
+      // own default is effectively "forever").
       connectionTimeout: 15000,
       greetingTimeout: 15000,
       socketTimeout: 15000,

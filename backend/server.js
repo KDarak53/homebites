@@ -1,4 +1,10 @@
 require('dotenv').config();
+// Render (confirmed via /api/health/test-email) has no outbound IPv6 route,
+// but Node's DNS resolver defaults to handing back IPv6 addresses first —
+// any outbound connection to a dual-stack host (SMTP, third-party APIs...)
+// would hit the same dead-end "ENETUNREACH <ipv6>" this caused for email.
+// Preferring IPv4 process-wide avoids the whole class of failure.
+require('dns').setDefaultResultOrder('ipv4first');
 const express = require('express');
 const path = require('path');
 const http = require('http');
