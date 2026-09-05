@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
+  useGetAllVendorsQuery,
   useGetPendingVendorsQuery,
   useApproveVendorMutation,
   useRejectVendorMutation,
+  useSuspendVendorMutation,
+  useUnsuspendVendorMutation,
   useGetAdminSettingsQuery,
   useUpdateAdminSettingsMutation,
   useGetAdminOverviewQuery,
@@ -48,7 +51,74 @@ function PendingVendorCard({ vendor }) {
   );
 }
 
+// Derives a single status badge from the three independent flags a vendor
+// can be in — order matters: a suspension overrides everything else, a
+// rejection only matters if never subsequently approved, etc.
+function vendorStatus(vendor) {
+  if (vendor.isSuspendedByAdmin) return { label: '⏸️ Suspended', tone: 'badge-red' };
+  if (!vendor.isApproved && vendor.rejectedAt) return { label: '❌ Rejected', tone: 'badge-slate' };
+  if (!vendor.isApproved) return { label: '⏳ Pending', tone: 'badge-amber' };
+  if (!vendor.isOpen) return { label: '🌙 Closed (by vendor)', tone: 'badge-slate' };
+  return { label: '✅ Live', tone: 'badge-green' };
+}
+
+function AllVendorCard({ vendor }) {
+  const [approveVendor, { isLoading: approving }] = useApproveVendorMutation();
+  const [suspendVendor, { isLoading: suspending }] = useSuspendVendorMutation();
+  const [unsuspendVendor, { isLoading: resuming }] = useUnsuspendVendorMutation();
+  const status = vendorStatus(vendor);
+  const busy = approving || suspending || resuming;
+
+  const handlePause = () => {
+    const reason = window.prompt(`Reason for pausing ${vendor.businessName}? (shown to the vendor, optional)`);
+    if (reason === null) return; // cancelled
+    suspendVendor({ id: vendor._id, reason });
+  };
+
+  return (
+    <div className="card p-4">
+      <div className="flex justify-between items-start gap-3 flex-wrap">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-slate-800">{vendor.businessName}</p>
+            <span className={status.tone}>{status.label}</span>
+            {vendor.subscriptionPlan === 'pro' && <span className="badge-amber">⭐ Pro</span>}
+          </div>
+          <p className="text-xs text-slate-500 mt-1">{vendor.user?.name} &middot; {vendor.user?.email} &middot; {vendor.user?.phone}</p>
+          <p className="text-xs text-slate-500 mt-0.5">🛡️ FSSAI: {vendor.fssaiLicense}</p>
+          {vendor.kitchenLocation?.address && <p className="text-xs text-slate-400 mt-0.5">📍 {vendor.kitchenLocation.address}</p>}
+          <p className="text-xs text-slate-400 mt-1">
+            ★ {vendor.averageRating?.toFixed?.(1) ?? 0} ({vendor.ratingCount || 0}) &middot; {vendor.totalOrdersCompleted || 0} orders &middot;{' '}
+            {vendor.deliveryEnabled ? `🛵 delivery up to ${vendor.maxDeliveryRadiusKm}km` : '🥡 takeaway only'}
+          </p>
+          {vendor.isSuspendedByAdmin && vendor.suspensionReason && (
+            <p className="text-xs text-red-600 mt-1 bg-red-50 rounded-lg px-2 py-1 inline-block">Reason: {vendor.suspensionReason}</p>
+          )}
+        </div>
+        <div className="flex gap-2 shrink-0">
+          {vendor.isSuspendedByAdmin ? (
+            <button disabled={busy} onClick={() => unsuspendVendor(vendor._id)} className="btn-primary text-xs px-3 py-1.5">
+              Resume
+            </button>
+          ) : vendor.isApproved ? (
+            <button disabled={busy} onClick={handlePause} className="text-xs px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 font-semibold">
+              Pause
+            </button>
+          ) : vendor.rejectedAt ? (
+            <button disabled={busy} onClick={() => approveVendor(vendor._id)} className="btn-primary text-xs px-3 py-1.5">
+              Re-approve
+            </button>
+          ) : (
+            <span className="text-xs text-slate-400 self-center">See pending queue above</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
+  const { data: allVendors, isLoading: allVendorsLoading } = useGetAllVendorsQuery();
   const { data: pending, isLoading: pendingLoading } = useGetPendingVendorsQuery();
   const { data: settings } = useGetAdminSettingsQuery();
   const [updateSettings, { isSuccess }] = useUpdateAdminSettingsMutation();
@@ -127,10 +197,21 @@ export default function AdminDashboard() {
       </div>
 
       <h2 className="font-semibold text-slate-800 mb-3">🏪 Vendors awaiting approval</h2>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 mb-8">
         {pendingLoading && <p className="text-slate-500 text-sm">Loading...</p>}
         {pending?.map((v) => <PendingVendorCard key={v._id} vendor={v} />)}
         {pending && pending.length === 0 && <p className="text-slate-500 text-sm">No vendors waiting — all caught up.</p>}
+      </div>
+
+      <h2 className="font-semibold text-slate-800 mb-3">🗂️ All vendors ({allVendors?.length ?? '...'})</h2>
+      <p className="text-xs text-slate-400 -mt-2 mb-3">
+        Full oversight of every kitchen on the platform — pause any of them at any point, for any reason. Pausing overrides the
+        vendor's own open/closed toggle, so they can't undo it themselves; they're emailed either way.
+      </p>
+      <div className="flex flex-col gap-3">
+        {allVendorsLoading && <p className="text-slate-500 text-sm">Loading...</p>}
+        {allVendors?.map((v) => <AllVendorCard key={v._id} vendor={v} />)}
+        {allVendors && allVendors.length === 0 && <p className="text-slate-500 text-sm">No vendors yet.</p>}
       </div>
     </div>
   );

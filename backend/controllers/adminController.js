@@ -4,7 +4,15 @@ const VendorProfile = require('../models/VendorProfile');
 const PlatformSettings = require('../models/PlatformSettings');
 const Order = require('../models/Order');
 const { notify } = require('../services/notify');
-const { sendVendorApprovalEmail } = require('../config/email');
+const { sendVendorApprovalEmail, sendVendorSuspensionEmail } = require('../config/email');
+
+// @desc  List every vendor, any status — the full oversight view (pending
+//        queue below is just the "needs a first decision" subset of this)
+// @route GET /api/admin/vendors
+const getAllVendors = asyncHandler(async (req, res) => {
+  const vendors = await VendorProfile.find({}).populate('user', 'name email phone').sort({ createdAt: -1 });
+  res.json(vendors);
+});
 
 // @desc  List vendors awaiting approval (excludes ones already rejected —
 //        otherwise a rejected vendor looks identical to a fresh, never-
@@ -86,6 +94,72 @@ const rejectVendor = asyncHandler(async (req, res) => {
   res.json(vendor);
 });
 
+// @desc  Pause an already-approved vendor at any point — separate override
+//        from approve/reject, and from the vendor's own isOpen toggle (which
+//        they'd otherwise just be able to flip back themselves)
+// @route POST /api/admin/vendors/:id/suspend
+const suspendVendor = asyncHandler(async (req, res) => {
+  const vendor = await VendorProfile.findById(req.params.id);
+  if (!vendor) {
+    res.status(404);
+    throw new Error('Vendor not found');
+  }
+  vendor.isSuspendedByAdmin = true;
+  vendor.suspensionReason = req.body.reason || '';
+  await vendor.save();
+
+  const io = req.app.get('io');
+  await notify(io, {
+    userId: vendor.user,
+    type: 'vendor_suspension',
+    title: 'Your kitchen has been paused',
+    body: req.body.reason || `${vendor.businessName} has been paused by HomeBites.`,
+  });
+
+  const owner = await User.findById(vendor.user).select('name email');
+  if (owner) {
+    sendVendorSuspensionEmail({
+      to: owner.email,
+      name: owner.name,
+      businessName: vendor.businessName,
+      suspended: true,
+      reason: req.body.reason,
+    }).catch((err) => console.error(`[email] Failed to send suspension email to ${owner.email}:`, err.message));
+  }
+
+  res.json(vendor);
+});
+
+// @desc  Resume a previously-paused vendor
+// @route POST /api/admin/vendors/:id/unsuspend
+const unsuspendVendor = asyncHandler(async (req, res) => {
+  const vendor = await VendorProfile.findById(req.params.id);
+  if (!vendor) {
+    res.status(404);
+    throw new Error('Vendor not found');
+  }
+  vendor.isSuspendedByAdmin = false;
+  vendor.suspensionReason = '';
+  await vendor.save();
+
+  const io = req.app.get('io');
+  await notify(io, {
+    userId: vendor.user,
+    type: 'vendor_suspension',
+    title: 'Your kitchen is active again',
+    body: `${vendor.businessName} has been resumed and is visible to customers again.`,
+  });
+
+  const owner = await User.findById(vendor.user).select('name email');
+  if (owner) {
+    sendVendorSuspensionEmail({ to: owner.email, name: owner.name, businessName: vendor.businessName, suspended: false }).catch((err) =>
+      console.error(`[email] Failed to send resume email to ${owner.email}:`, err.message)
+    );
+  }
+
+  res.json(vendor);
+});
+
 // @desc  Read platform-wide settings (delivery rollout, commission rates)
 // @route GET /api/admin/settings
 const getSettings = asyncHandler(async (req, res) => {
@@ -133,4 +207,14 @@ const getOverview = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { getPendingVendors, approveVendor, rejectVendor, getSettings, updateSettings, getOverview };
+module.exports = {
+  getAllVendors,
+  getPendingVendors,
+  approveVendor,
+  rejectVendor,
+  suspendVendor,
+  unsuspendVendor,
+  getSettings,
+  updateSettings,
+  getOverview,
+};

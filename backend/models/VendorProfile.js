@@ -38,6 +38,13 @@ const vendorProfileSchema = new mongoose.Schema(
     // eventually accepted.
     rejectedAt: { type: Date, default: null },
 
+    // A platform-level override, separate from the vendor's own `isOpen`
+    // toggle (Settings) — if these were the same field, a vendor the admin
+    // paused could just flip their own kitchen back "open" and undo it.
+    // Discovery and order placement both check this in addition to isOpen.
+    isSuspendedByAdmin: { type: Boolean, default: false },
+    suspensionReason: { type: String, default: '' },
+
     // Optional paid tier: a lower per-order commission in exchange for a
     // flat monthly fee, plus priority placement — a second, volume-independent
     // revenue lever alongside per-order commission (see Order.platformCommissionRate).

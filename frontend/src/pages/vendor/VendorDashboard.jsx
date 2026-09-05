@@ -106,6 +106,18 @@ export default function VendorDashboard() {
         </p>
       )}
 
+      {profile?.isSuspendedByAdmin && (
+        <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+          ⏸️ Your kitchen has been paused by HomeBites — it's hidden from customers and can't take orders until resumed.
+          {profile.suspensionReason && (
+            <>
+              {' '}
+              <span className="font-medium">Reason: {profile.suspensionReason}</span>
+            </>
+          )}
+        </p>
+      )}
+
       {analytics && (
         <div className="flex flex-wrap gap-4 mb-6">
           <div className="card px-5 py-3.5 flex-1 min-w-[150px] max-w-[200px]">

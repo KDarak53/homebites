@@ -32,7 +32,13 @@ async function validateAndPrice({ vendorId, items, orderType, fulfillmentMethod,
   }
 
   const vendor = await VendorProfile.findById(vendorId);
-  if (!vendor || !vendor.isOpen || !vendor.isApproved) {
+  if (!vendor || !vendor.isApproved) {
+    throw new Error('Vendor is not available for orders right now');
+  }
+  if (vendor.isSuspendedByAdmin) {
+    throw new Error('This kitchen has been paused by HomeBites and is not accepting orders right now');
+  }
+  if (!vendor.isOpen) {
     throw new Error('Vendor is not available for orders right now');
   }
 

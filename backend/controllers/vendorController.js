@@ -16,7 +16,7 @@ const getNearbyVendors = asyncHandler(async (req, res) => {
     throw new Error('lng and lat query params are required');
   }
 
-  const filter = { isApproved: true, isOpen: true };
+  const filter = { isApproved: true, isOpen: true, isSuspendedByAdmin: { $ne: true } };
   if (veg === 'true') filter.isVegOnly = true;
 
   // $geoNear (rather than a plain $near filter) is needed to get each

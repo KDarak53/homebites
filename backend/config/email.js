@@ -62,4 +62,24 @@ function sendVendorApprovalEmail({ to, name, businessName, approved, reason }) {
   });
 }
 
-module.exports = { isConfigured, sendVerificationEmail, sendVendorApprovalEmail };
+// Sent when an admin pauses or resumes a vendor's kitchen — an override
+// distinct from approve/reject (see VendorProfile.isSuspendedByAdmin) that
+// can happen at any point in a kitchen's lifetime, not just at onboarding.
+function sendVendorSuspensionEmail({ to, name, businessName, suspended, reason }) {
+  if (suspended) {
+    return send({
+      to,
+      subject: `${businessName} has been paused on HomeBites`,
+      text: `Hi ${name},\n\n${businessName} has been paused by HomeBites and is temporarily not visible to customers or accepting orders.\n\n${reason || 'Contact HomeBites support for details.'}\n\nLog in for more: ${process.env.CLIENT_URL || 'http://localhost:5173'}/login-vendor`,
+      html: `<p>Hi ${name},</p><p><strong>${businessName}</strong> has been paused by HomeBites and is temporarily not visible to customers or accepting orders.</p><p>${reason || 'Contact HomeBites support for details.'}</p><p><a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/login-vendor">Log in for more</a></p>`,
+    });
+  }
+  return send({
+    to,
+    subject: `${businessName} is active again on HomeBites`,
+    text: `Hi ${name},\n\nGood news — ${businessName} has been resumed and is visible to customers and accepting orders again.\n\nLog in to manage your kitchen: ${process.env.CLIENT_URL || 'http://localhost:5173'}/login-vendor`,
+    html: `<p>Hi ${name},</p><p>Good news — <strong>${businessName}</strong> has been resumed and is visible to customers and accepting orders again.</p><p><a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/login-vendor">Log in to manage your kitchen</a></p>`,
+  });
+}
+
+module.exports = { isConfigured, sendVerificationEmail, sendVendorApprovalEmail, sendVendorSuspensionEmail };
