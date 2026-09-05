@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken');
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const { runDailySubscriptionCycle } = require('./utils/subscriptionScheduler');
-const { isConfigured: emailConfigured } = require('./config/email');
+const { isConfigured: emailConfigured, sendVerificationEmail } = require('./config/email');
 const { isConfigured: paymentsConfigured } = require('./config/payments');
 
 const authRoutes = require('./routes/authRoutes');
@@ -70,6 +70,21 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Booleans only — never the actual credentials — so mock-vs-real mode for a
 // service is checkable without digging through host logs.
 app.get('/api/health', (req, res) => res.json({ status: 'ok', emailConfigured, paymentsConfigured }));
+
+// TEMPORARY diagnostic while wiring up SMTP — actually attempts a send and
+// reports the real error inline (background sends elsewhere only log to
+// server console, which isn't reachable from outside). Remove once email
+// delivery is confirmed working end-to-end.
+app.get('/api/health/test-email', async (req, res) => {
+  const to = req.query.to;
+  if (!to) return res.status(400).json({ error: 'pass ?to=<email>' });
+  try {
+    const result = await sendVerificationEmail({ to, name: 'Test', verifyUrl: 'https://example.com/verify-email?token=test' });
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, code: err.code });
+  }
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
