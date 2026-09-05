@@ -2,6 +2,7 @@ const express = require('express');
 const {
   getAllVendors,
   getVendorDetails,
+  getItemHistory,
   getPendingVendors,
   approveVendor,
   rejectVendor,
@@ -20,6 +21,7 @@ router.use(protect, requireRole('admin'));
 router.get('/vendors', getAllVendors);
 router.get('/vendors/pending', getPendingVendors);
 router.get('/vendors/:id/details', getVendorDetails);
+router.get('/vendors/:vendorId/items/:productId/history', getItemHistory);
 router.post('/vendors/:id/approve', approveVendor);
 router.post('/vendors/:id/reject', rejectVendor);
 router.post('/vendors/:id/suspend', suspendVendor);

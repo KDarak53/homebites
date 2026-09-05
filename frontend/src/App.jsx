@@ -16,6 +16,7 @@ import Orders from './pages/Orders';
 import Profile from './pages/Profile';
 import MySubscriptions from './pages/MySubscriptions';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminVendorDetail from './pages/AdminVendorDetail';
 
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import MenuManagement from './pages/vendor/MenuManagement';
@@ -120,6 +121,14 @@ export default function App() {
           element={
             <ProtectedRoute role="admin">
               <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/vendors/:id"
+          element={
+            <ProtectedRoute role="admin">
+              <AdminVendorDetail />
             </ProtectedRoute>
           }
         />

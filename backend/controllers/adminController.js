@@ -68,6 +68,67 @@ const getVendorDetails = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc  Full order history + stats for one menu item — the "click an item"
+//        drill-down from the vendor detail page. Line-level, not just a
+//        total: which order, which customer, when, Direct vs Prebook.
+// @route GET /api/admin/vendors/:vendorId/items/:productId/history
+const getItemHistory = asyncHandler(async (req, res) => {
+  const { vendorId, productId } = req.params;
+
+  const product = await Product.findOne({ _id: productId, vendor: vendorId });
+  if (!product) {
+    res.status(404);
+    throw new Error('Item not found for this vendor');
+  }
+
+  const orders = await Order.find({ vendor: vendorId, paymentStatus: 'paid', 'items.product': productId })
+    .populate('user', 'name email')
+    .sort({ createdAt: -1 });
+
+  const lines = [];
+  let totalQuantity = 0;
+  let totalRevenue = 0;
+  let directQuantity = 0;
+  let prebookQuantity = 0;
+
+  orders.forEach((order) => {
+    order.items
+      .filter((item) => String(item.product) === String(productId))
+      .forEach((item) => {
+        totalQuantity += item.quantity;
+        totalRevenue += item.quantity * item.unitPrice;
+        if (order.orderType === 'Direct') directQuantity += item.quantity;
+        else prebookQuantity += item.quantity;
+
+        lines.push({
+          orderId: order._id,
+          customerName: order.user?.name || 'Unknown',
+          customerEmail: order.user?.email || '',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          lineRevenue: item.quantity * item.unitPrice,
+          orderType: order.orderType,
+          fulfillmentMethod: order.fulfillmentMethod,
+          status: order.status,
+          createdAt: order.createdAt,
+        });
+      });
+  });
+
+  res.json({
+    product,
+    summary: {
+      totalQuantity,
+      totalRevenue,
+      directQuantity,
+      prebookQuantity,
+      orderCount: lines.length,
+      avgQuantityPerOrder: lines.length ? +(totalQuantity / lines.length).toFixed(1) : 0,
+    },
+    lines,
+  });
+});
+
 // @desc  List vendors awaiting approval (excludes ones already rejected —
 //        otherwise a rejected vendor looks identical to a fresh, never-
 //        reviewed one and never leaves this queue)
@@ -272,6 +333,7 @@ const getOverview = asyncHandler(async (req, res) => {
 module.exports = {
   getAllVendors,
   getVendorDetails,
+  getItemHistory,
   getPendingVendors,
   approveVendor,
   rejectVendor,
