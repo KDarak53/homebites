@@ -20,7 +20,15 @@ async function issueVerificationEmail(user) {
 
   const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
   const verifyUrl = `${clientUrl}/verify-email?token=${rawToken}`;
-  await sendVerificationEmail({ to: user.email, name: user.name, verifyUrl });
+
+  // Deliberately not awaited: the token is already saved above, which is
+  // all the response needs to be honest ("check your email"). A slow or
+  // unreachable mail provider must never be able to hang or fail the
+  // registration request itself — that turned a broken SMTP connection
+  // into "signup is down" for every user, not just a missing email.
+  sendVerificationEmail({ to: user.email, name: user.name, verifyUrl }).catch((err) => {
+    console.error(`[email] Failed to send verification email to ${user.email}:`, err.message);
+  });
 }
 
 // @desc  Register a customer

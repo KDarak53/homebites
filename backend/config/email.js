@@ -12,6 +12,13 @@ const transporter = isConfigured
       port: Number(process.env.SMTP_PORT) || 587,
       secure: Number(process.env.SMTP_PORT) === 465,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      // Some hosts (Render included) block outbound SMTP ports outright, in
+      // which case the connection just hangs rather than refusing cleanly —
+      // these caps make that fail loud in ~15s instead of hanging for
+      // minutes (Node's own default is effectively "forever").
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 15000,
     })
   : null;
 
