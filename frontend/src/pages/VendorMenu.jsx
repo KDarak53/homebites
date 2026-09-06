@@ -140,19 +140,24 @@ function MenuItemCard({ item, vendorId, vendorName }) {
         </div>
         {item.description && <p className="text-sm text-slate-500 mt-1">{item.description}</p>}
         <p className="text-base font-bold text-slate-700 mt-1.5">₹{item.price}</p>
-        <p className="text-xs text-slate-400 mt-1">
-          {item.currentQuantity > 0 ? (
-            <span className="text-emerald-600 font-medium">{item.currentQuantity} left now</span>
-          ) : (
-            <span className="text-red-500 font-medium">Sold out for now</span>
-          )}
-          {item.canPrebook && (
-            <>
-              {' · '}
-              <span className="text-blue-600 font-medium">{item.nextBatchQuantity} left to pre-book</span>
-            </>
-          )}
-        </p>
+        {/* Direct-order stock is only shown for items that actually support
+            direct ordering — otherwise "X left now" implied you could order
+            it right away when the "Add now" button wasn't even there. Sold
+            out (temporary) still shows for a direct-order item; not offered
+            at all (permanent, vendor setting) hides the line entirely. */}
+        {(item.availableForDirectOrder || item.canPrebook) && (
+          <p className="text-xs text-slate-400 mt-1">
+            {item.availableForDirectOrder && (
+              item.currentQuantity > 0 ? (
+                <span className="text-emerald-600 font-medium">{item.currentQuantity} left now</span>
+              ) : (
+                <span className="text-red-500 font-medium">Sold out for now</span>
+              )
+            )}
+            {item.availableForDirectOrder && item.canPrebook && ' · '}
+            {item.canPrebook && <span className="text-blue-600 font-medium">{item.nextBatchQuantity} left to pre-book</span>}
+          </p>
+        )}
         {item.canPrebook && (item.collectionStartTime || item.collectionEndTime) && (
           <p className="text-xs text-slate-400 mt-0.5">
             🥡 Ready for collection: {item.collectionStartTime ? new Date(item.collectionStartTime).toLocaleString() : 'now'}
@@ -164,22 +169,28 @@ function MenuItemCard({ item, vendorId, vendorName }) {
       </div>
 
       <div className="flex flex-row sm:flex-col gap-2 shrink-0">
-        {directLine ? (
-          <QuantityStepper
-            label={`${item.itemName} (direct)`}
-            quantity={directLine.quantity}
-            atMax={directLine.quantity >= item.currentQuantity}
-            onIncrement={() => handleAdd('Direct')}
-            onDecrement={() => handleDecrement(directLine)}
-          />
-        ) : (
-          <button
-            disabled={!item.canOrderDirect}
-            onClick={() => handleAdd('Direct')}
-            className="btn-primary text-sm px-3.5 py-1.5 disabled:!bg-none disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
-          >
-            Add now
-          </button>
+        {/* Same rule as pre-book below: only rendered for items that support
+            direct ordering at all. A temporarily sold-out item still shows a
+            greyed "Add now" (that's useful, actionable info); an item never
+            offered for direct order shows nothing instead of a dead button. */}
+        {(item.availableForDirectOrder || directLine) && (
+          directLine ? (
+            <QuantityStepper
+              label={`${item.itemName} (direct)`}
+              quantity={directLine.quantity}
+              atMax={directLine.quantity >= item.currentQuantity}
+              onIncrement={() => handleAdd('Direct')}
+              onDecrement={() => handleDecrement(directLine)}
+            />
+          ) : (
+            <button
+              disabled={!item.canOrderDirect}
+              onClick={() => handleAdd('Direct')}
+              className="btn-primary text-sm px-3.5 py-1.5 disabled:!bg-none disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+            >
+              Add now
+            </button>
+          )
         )}
         {/* Pre-book is only ever rendered when it's actually bookable — a
             disabled "Pre-book" button or "batch full" label previously stuck
