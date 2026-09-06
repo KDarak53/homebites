@@ -5,7 +5,7 @@ import { useGetVendorByIdQuery } from '../api/vendorApi';
 import { useInitiateOrderPaymentMutation, useConfirmOrderPaymentMutation } from '../api/orderApi';
 import { removeItem, updateQuantity, clearCart } from '../store/slices/cartSlice';
 import useGeolocation from '../hooks/useGeolocation';
-import { DEFAULT_LOCATION, localDatetimeToISO } from '../constants';
+import { DEFAULT_LOCATION } from '../constants';
 import { collectPayment } from '../utils/razorpay';
 
 export default function Cart() {
@@ -27,7 +27,6 @@ export default function Cart() {
   const isLoading = isInitiating || isConfirming;
 
   const [fulfillmentMethod, setFulfillmentMethod] = useState('Takeaway');
-  const [scheduledFor, setScheduledFor] = useState('');
   const [address, setAddress] = useState('');
 
   const orderType = cart.items[0]?.orderType || 'Direct';
@@ -57,10 +56,12 @@ export default function Cart() {
     return { from, until, invalid: from && until && from > until };
   })();
 
-  const toDatetimeLocalValue = (date) => {
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  };
+  // Pickup is the vendor's collection window itself, not a time the customer
+  // dials in — there's nothing to schedule, so the value sent to the backend
+  // (which still records a single timestamp and validates it falls in-window)
+  // is just the start of that window. No window set at all just means "the
+  // vendor will sort out timing after accepting" — fall back to now.
+  const autoScheduledFor = orderType === 'Prebook' ? collectionWindow?.from || new Date() : null;
 
   if (cart.items.length === 0) {
     return (
@@ -75,16 +76,9 @@ export default function Cart() {
   const handleCheckout = async () => {
     setCheckoutError('');
 
-    if (orderType === 'Prebook' && collectionWindow && !collectionWindow.invalid) {
-      const chosen = new Date(scheduledFor);
-      if ((collectionWindow.from && chosen < collectionWindow.from) || (collectionWindow.until && chosen > collectionWindow.until)) {
-        setCheckoutError(
-          `Please pick a time the vendor can actually hand this over: ${
-            collectionWindow.from ? collectionWindow.from.toLocaleString() : 'now'
-          } – ${collectionWindow.until ? collectionWindow.until.toLocaleString() : 'further notice'}.`
-        );
-        return;
-      }
+    if (orderType === 'Prebook' && collectionWindow?.invalid) {
+      setCheckoutError('Items in this cart have conflicting collection times — check with the vendor before ordering.');
+      return;
     }
 
     const orderPayload = {
@@ -92,7 +86,7 @@ export default function Cart() {
       items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
       orderType,
       fulfillmentMethod,
-      scheduledFor: orderType === 'Prebook' ? localDatetimeToISO(scheduledFor) : undefined,
+      scheduledFor: orderType === 'Prebook' ? autoScheduledFor.toISOString() : undefined,
       deliveryCoordinates: fulfillmentMethod === 'Delivery' ? [deliveryLocation.longitude, deliveryLocation.latitude] : undefined,
       deliveryAddress: fulfillmentMethod === 'Delivery' ? address : undefined,
     };
@@ -227,28 +221,28 @@ export default function Cart() {
           </div>
         )}
 
+        {/* No time picker here — the customer can't schedule an arbitrary
+            pickup moment, they just collect sometime within the window the
+            vendor already set (shown on the menu page too). Sending an exact
+            scheduledFor is still a backend requirement, so autoScheduledFor
+            quietly uses the start of that window rather than asking for one. */}
         {orderType === 'Prebook' && (
           <div className="mt-3">
-            <label className="text-sm text-slate-600 block mb-1">📅 Scheduled time</label>
-            <input
-              type="datetime-local"
-              value={scheduledFor}
-              onChange={(e) => setScheduledFor(e.target.value)}
-              min={collectionWindow?.from ? toDatetimeLocalValue(collectionWindow.from) : undefined}
-              max={collectionWindow?.until ? toDatetimeLocalValue(collectionWindow.until) : undefined}
-              required
-              className="input text-sm"
-            />
             {collectionWindow && !collectionWindow.invalid && (
-              <p className="text-xs text-slate-400 mt-1">
-                🥡 Vendor will have this ready {collectionWindow.from ? `from ${collectionWindow.from.toLocaleString()}` : ''}
+              <p className="text-sm text-slate-600 bg-orange-50 rounded-lg px-3 py-2">
+                🥡 Collect this {collectionWindow.from ? `from ${collectionWindow.from.toLocaleString()}` : ''}
                 {collectionWindow.from && collectionWindow.until && ' '}
-                {collectionWindow.until ? `until ${collectionWindow.until.toLocaleString()}` : ''}
+                {collectionWindow.until ? `until ${collectionWindow.until.toLocaleString()}` : ''} — no need to pick a time, just come by within that window.
               </p>
             )}
             {collectionWindow?.invalid && (
-              <p className="text-xs text-amber-700 mt-1">
-                ⚠️ Items in this cart have conflicting collection times — check with the vendor before picking a time.
+              <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                ⚠️ Items in this cart have conflicting collection times — check with the vendor before ordering.
+              </p>
+            )}
+            {!collectionWindow && (
+              <p className="text-sm text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
+                🥡 The vendor hasn't set a specific collection window yet — they'll confirm pickup timing once they accept your order.
               </p>
             )}
           </div>
@@ -267,7 +261,7 @@ export default function Cart() {
 
       <button
         onClick={handleCheckout}
-        disabled={isLoading || (orderType === 'Prebook' && !scheduledFor)}
+        disabled={isLoading || (orderType === 'Prebook' && collectionWindow?.invalid)}
         className="btn-primary w-full py-3 text-base"
       >
         {isLoading ? 'Placing order...' : `Place order · ₹${total}`}
