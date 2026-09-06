@@ -225,10 +225,11 @@ function PrebookWindowControl({ product }) {
               prebookCutoffTime: localDatetimeToISO(closesAt),
               collectionStartTime: localDatetimeToISO(collectFrom),
               collectionEndTime: localDatetimeToISO(collectUntil),
+              nextBatchQuantity: nextBatchQty,
             })
           }
           className="btn-primary text-xs px-2.5 py-1"
-          title="Rolls the next-batch quantity into today's live stock and applies the order window and collection time above to the new next batch"
+          title="Rolls today's live stock over from whatever was reserved before, then sets the qty above as the new next-batch stock for this window"
         >
           Open next batch
         </button>

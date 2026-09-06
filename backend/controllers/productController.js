@@ -133,7 +133,12 @@ const openNextBatch = asyncHandler(async (req, res) => {
   }
 
   product.currentQuantity = product.nextBatchQuantity || product.maxQuantityPerBatch;
-  product.nextBatchQuantity = 0;
+  // Was hardcoded to 0 here regardless of whatever the vendor had just typed
+  // into the "Next batch qty" field next to this button — silently
+  // discarding it, so a vendor's very first "open next batch" click (the
+  // natural way to try to enable pre-order) always left pre-book stock at 0
+  // no matter what they entered. Now actually uses it.
+  product.nextBatchQuantity = req.body.nextBatchQuantity || 0;
   product.prebookOpensAt = req.body.prebookOpensAt || null;
   product.prebookCutoffTime = req.body.prebookCutoffTime || null;
   product.collectionStartTime = req.body.collectionStartTime || null;
