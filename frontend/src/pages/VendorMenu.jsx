@@ -212,6 +212,12 @@ function MenuItemCard({ item, vendorId, vendorName }) {
             </button>
           )
         )}
+        {/* Neither ordering mode is available right now (e.g. direct order
+            is off for this item and no pre-book batch is open) — say so
+            instead of leaving a blank card that looks broken. */}
+        {!item.availableForDirectOrder && !item.canPrebook && !directLine && !prebookLine && (
+          <span className="text-xs text-slate-400 italic px-1">Not available right now</span>
+        )}
       </div>
     </div>
   );
