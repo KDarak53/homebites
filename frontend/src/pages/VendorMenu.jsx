@@ -146,18 +146,14 @@ function MenuItemCard({ item, vendorId, vendorName }) {
           ) : (
             <span className="text-red-500 font-medium">Sold out for now</span>
           )}
-          {item.availableForPrebook && item.isPrebookOpen && (
+          {item.canPrebook && (
             <>
               {' · '}
-              {item.nextBatchQuantity > 0 ? (
-                <span className="text-blue-600 font-medium">{item.nextBatchQuantity} left to pre-book</span>
-              ) : (
-                <span className="text-red-500 font-medium">Pre-book batch full</span>
-              )}
+              <span className="text-blue-600 font-medium">{item.nextBatchQuantity} left to pre-book</span>
             </>
           )}
         </p>
-        {item.availableForPrebook && (item.collectionStartTime || item.collectionEndTime) && (
+        {item.canPrebook && (item.collectionStartTime || item.collectionEndTime) && (
           <p className="text-xs text-slate-400 mt-0.5">
             🥡 Ready for collection: {item.collectionStartTime ? new Date(item.collectionStartTime).toLocaleString() : 'now'}
             {' → '}
@@ -185,7 +181,12 @@ function MenuItemCard({ item, vendorId, vendorName }) {
             Add now
           </button>
         )}
-        {item.availableForPrebook && (
+        {/* Pre-book is only ever rendered when it's actually bookable — a
+            disabled "Pre-book" button or "batch full" label previously stuck
+            around even when there was nothing to book, which just confused
+            customers. A line already in the cart stays visible so it can
+            still be adjusted even if the batch fills up around it. */}
+        {(item.canPrebook || prebookLine) && (
           prebookLine ? (
             <QuantityStepper
               label={`${item.itemName} (pre-book)`}
@@ -195,11 +196,7 @@ function MenuItemCard({ item, vendorId, vendorName }) {
               onDecrement={() => handleDecrement(prebookLine)}
             />
           ) : (
-            <button
-              disabled={!item.canPrebook}
-              onClick={() => handleAdd('Prebook')}
-              className="btn-outline text-sm px-3.5 py-1.5 disabled:border-slate-200 disabled:text-slate-400 disabled:bg-white"
-            >
+            <button onClick={() => handleAdd('Prebook')} className="btn-outline text-sm px-3.5 py-1.5">
               Pre-book
             </button>
           )

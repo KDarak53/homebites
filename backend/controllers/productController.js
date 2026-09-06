@@ -12,12 +12,39 @@ const getOwnVendorProfileOr403 = async (userId) => {
   return vendor;
 };
 
+// A pre-book cycle is "done" once its collection window has ended (or, if no
+// collection window was set, once the order cutoff has passed). Once that
+// happens the whole cycle — order window, collection window, next-batch qty —
+// is stale and gets zeroed out so the vendor always configures a fresh cycle
+// explicitly rather than an old one silently lingering (and possibly still
+// showing as prebook-able to customers via a leftover nextBatchQuantity).
+// Applied lazily on read rather than via a cron job, since nothing reads a
+// finished cycle's fields before the next fetch anyway.
+const resetProductIfPrebookCycleEnded = async (product) => {
+  const cycleEnd = product.collectionEndTime || product.prebookCutoffTime;
+  if (!cycleEnd || cycleEnd.getTime() > Date.now()) return false;
+
+  const hasStaleConfig =
+    product.nextBatchQuantity > 0 || product.prebookOpensAt || product.prebookCutoffTime || product.collectionStartTime || product.collectionEndTime;
+  if (!hasStaleConfig) return false;
+
+  product.nextBatchQuantity = 0;
+  product.prebookOpensAt = null;
+  product.prebookCutoffTime = null;
+  product.collectionStartTime = null;
+  product.collectionEndTime = null;
+  await product.save();
+  return true;
+};
+
 // @desc  Public: list a vendor's menu
 // @route GET /api/products/vendor/:vendorId
 const getMenuByVendor = asyncHandler(async (req, res) => {
   const products = await Product.find({ vendor: req.params.vendorId, isActive: true }).sort({
     createdAt: -1,
   });
+
+  await Promise.all(products.map(resetProductIfPrebookCycleEnded));
 
   // orderability flag mirrors the "Add to Cart" disable rule:
   // available if currentQuantity > 0 OR a pre-book window is open AND the
@@ -39,6 +66,7 @@ const getMenuByVendor = asyncHandler(async (req, res) => {
 const getMyMenu = asyncHandler(async (req, res) => {
   const vendor = await getOwnVendorProfileOr403(req.user._id);
   const products = await Product.find({ vendor: vendor._id }).sort({ createdAt: -1 });
+  await Promise.all(products.map(resetProductIfPrebookCycleEnded));
   res.json(products);
 });
 
@@ -121,33 +149,6 @@ const updateProduct = asyncHandler(async (req, res) => {
   res.json(product);
 });
 
-// @desc  Vendor: open a new batch cycle (rolls nextBatchQuantity into currentQuantity)
-// @route POST /api/products/:id/open-next-batch
-const openNextBatch = asyncHandler(async (req, res) => {
-  const vendor = await getOwnVendorProfileOr403(req.user._id);
-  const product = await Product.findOne({ _id: req.params.id, vendor: vendor._id });
-
-  if (!product) {
-    res.status(404);
-    throw new Error('Product not found');
-  }
-
-  product.currentQuantity = product.nextBatchQuantity || product.maxQuantityPerBatch;
-  // Was hardcoded to 0 here regardless of whatever the vendor had just typed
-  // into the "Next batch qty" field next to this button — silently
-  // discarding it, so a vendor's very first "open next batch" click (the
-  // natural way to try to enable pre-order) always left pre-book stock at 0
-  // no matter what they entered. Now actually uses it.
-  product.nextBatchQuantity = req.body.nextBatchQuantity || 0;
-  product.prebookOpensAt = req.body.prebookOpensAt || null;
-  product.prebookCutoffTime = req.body.prebookCutoffTime || null;
-  product.collectionStartTime = req.body.collectionStartTime || null;
-  product.collectionEndTime = req.body.collectionEndTime || null;
-  await product.save();
-
-  res.json(product);
-});
-
 // @desc  Vendor: delete menu item
 // @route DELETE /api/products/:id
 const deleteProduct = asyncHandler(async (req, res) => {
@@ -167,6 +168,5 @@ module.exports = {
   getMyMenu,
   createProduct,
   updateProduct,
-  openNextBatch,
   deleteProduct,
 };

@@ -18,14 +18,6 @@ export const productApi = apiSlice.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/products/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['Product'],
     }),
-    openNextBatch: builder.mutation({
-      query: ({ id, prebookOpensAt, prebookCutoffTime, collectionStartTime, collectionEndTime, nextBatchQuantity }) => ({
-        url: `/products/${id}/open-next-batch`,
-        method: 'POST',
-        body: { prebookOpensAt, prebookCutoffTime, collectionStartTime, collectionEndTime, nextBatchQuantity },
-      }),
-      invalidatesTags: ['Product'],
-    }),
     deleteProduct: builder.mutation({
       query: (id) => ({ url: `/products/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Product'],
@@ -38,6 +30,5 @@ export const {
   useGetMyMenuQuery,
   useCreateProductMutation,
   useUpdateProductMutation,
-  useOpenNextBatchMutation,
   useDeleteProductMutation,
 } = productApi;

@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   useGetMyMenuQuery,
   useCreateProductMutation,
   useUpdateProductMutation,
-  useOpenNextBatchMutation,
   useDeleteProductMutation,
 } from '../../api/productApi';
 import ImageUploader from '../../components/ImageUploader';
@@ -121,120 +120,91 @@ function toDatetimeLocalValue(date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// One unified action: the vendor sets the order window, the collection
+// window and the batch quantity together and saves them in a single request.
+// Once the cycle ends (collection window closes, or the order cutoff passes
+// if no collection window was set) the backend automatically zeroes all of
+// it out — see resetProductIfPrebookCycleEnded in productController.js — so
+// a finished cycle never lingers and looks like it's still live; the vendor
+// just fills this form in again to open the next one.
 function PrebookWindowControl({ product }) {
   const [opensAt, setOpensAt] = useState(toDatetimeLocalValue(product.prebookOpensAt));
   const [closesAt, setClosesAt] = useState(toDatetimeLocalValue(product.prebookCutoffTime));
   const [collectFrom, setCollectFrom] = useState(toDatetimeLocalValue(product.collectionStartTime));
   const [collectUntil, setCollectUntil] = useState(toDatetimeLocalValue(product.collectionEndTime));
-  const [nextBatchQty, setNextBatchQty] = useState(product.maxQuantityPerBatch);
+  const [qty, setQty] = useState(product.nextBatchQuantity || '');
   const [updateProduct, { isLoading: saving }] = useUpdateProductMutation();
-  const [openNextBatch, { isLoading: opening }] = useOpenNextBatchMutation();
+
+  // Keep the form in sync when the product changes from outside this form —
+  // most notably when the backend auto-resets a finished cycle back to zero,
+  // which should clear these fields here too rather than leaving stale values.
+  useEffect(() => {
+    setOpensAt(toDatetimeLocalValue(product.prebookOpensAt));
+    setClosesAt(toDatetimeLocalValue(product.prebookCutoffTime));
+    setCollectFrom(toDatetimeLocalValue(product.collectionStartTime));
+    setCollectUntil(toDatetimeLocalValue(product.collectionEndTime));
+    setQty(product.nextBatchQuantity || '');
+  }, [product.prebookOpensAt, product.prebookCutoffTime, product.collectionStartTime, product.collectionEndTime, product.nextBatchQuantity]);
 
   const now = new Date();
   const opensAtDate = product.prebookOpensAt ? new Date(product.prebookOpensAt) : null;
   const cutoffDate = product.prebookCutoffTime ? new Date(product.prebookCutoffTime) : null;
-  const collectFromDate = product.collectionStartTime ? new Date(product.collectionStartTime) : null;
-  const collectUntilDate = product.collectionEndTime ? new Date(product.collectionEndTime) : null;
+  const isConfigured = cutoffDate && product.nextBatchQuantity > 0;
 
-  let status = { icon: '⚪', tone: 'text-slate-400', label: 'No pre-order window scheduled' };
-  if (cutoffDate) {
+  let status = { icon: '⚪', tone: 'text-slate-400', label: 'Not set up — fill in the details below to open a batch' };
+  if (isConfigured) {
     if (cutoffDate <= now) {
-      status = { icon: '🔴', tone: 'text-slate-400', label: 'Closed' };
+      status = { icon: '🔴', tone: 'text-slate-400', label: 'Closed — will reset to zero shortly, set a new batch below' };
     } else if (opensAtDate && opensAtDate > now) {
-      status = { icon: '🕒', tone: 'text-amber-600 font-medium', label: `Opens ${opensAtDate.toLocaleString()} · closes ${cutoffDate.toLocaleString()}` };
+      status = { icon: '🕒', tone: 'text-amber-600 font-medium', label: `Opens ${opensAtDate.toLocaleString()} · closes ${cutoffDate.toLocaleString()} · ${product.nextBatchQuantity} to pre-book` };
     } else {
-      status = { icon: '🟢', tone: 'text-emerald-600 font-medium', label: `Open now · closes ${cutoffDate.toLocaleString()}` };
+      status = { icon: '🟢', tone: 'text-emerald-600 font-medium', label: `Open now · closes ${cutoffDate.toLocaleString()} · ${product.nextBatchQuantity} to pre-book` };
     }
   }
 
-  let collectionLabel = 'Not set — customers will be asked to pick any time';
-  if (collectFromDate || collectUntilDate) {
-    collectionLabel = `${collectFromDate ? collectFromDate.toLocaleString() : 'now'} → ${
-      collectUntilDate ? collectUntilDate.toLocaleString() : 'further notice'
-    }`;
-  }
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    updateProduct({
+      id: product._id,
+      prebookOpensAt: localDatetimeToISO(opensAt),
+      prebookCutoffTime: localDatetimeToISO(closesAt),
+      collectionStartTime: localDatetimeToISO(collectFrom),
+      collectionEndTime: localDatetimeToISO(collectUntil),
+      nextBatchQuantity: Number(qty) || 0,
+    });
+  };
 
   return (
-    <div className="mt-2 pt-2 border-t border-slate-100 text-xs flex flex-col gap-1.5">
-      <p className={status.tone}>
-        {status.icon} Pre-order window: {status.label} · next batch qty: {product.nextBatchQuantity}
-      </p>
-      <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-2">
-        <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5 text-slate-500">
-          Opens
-          <input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} className="input py-1.5 sm:py-1 text-xs w-full sm:w-auto" />
+    <form onSubmit={handleSubmit} className="mt-2 pt-2 border-t border-slate-100 text-xs flex flex-col gap-2">
+      <p className={status.tone}>{status.icon} {status.label}</p>
+      <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1 text-slate-500">
+          Order opens
+          <input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} className="input py-1.5 text-xs w-full" />
         </label>
-        <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5 text-slate-500">
-          Closes
-          <input type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} className="input py-1.5 sm:py-1 text-xs w-full sm:w-auto" />
+        <label className="flex flex-col gap-1 text-slate-500">
+          Order closes
+          <input type="datetime-local" required value={closesAt} onChange={(e) => setClosesAt(e.target.value)} className="input py-1.5 text-xs w-full" />
         </label>
-        <button
-          disabled={saving}
-          onClick={() =>
-            updateProduct({
-              id: product._id,
-              prebookOpensAt: localDatetimeToISO(opensAt),
-              prebookCutoffTime: localDatetimeToISO(closesAt),
-              nextBatchQuantity: nextBatchQty,
-            })
-          }
-          className="btn-ghost text-xs px-2.5 py-2 sm:py-1 bg-slate-100 w-full xs:col-span-2 sm:w-auto"
-        >
-          Set window
-        </button>
-      </div>
-
-      <p className="text-slate-400 mt-1">
-        🥡 Available to collect: <span className={collectFromDate || collectUntilDate ? 'text-slate-600 font-medium' : ''}>{collectionLabel}</span>
-      </p>
-      <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-2">
-        <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5 text-slate-500">
+        <label className="flex flex-col gap-1 text-slate-500">
           Collect from
-          <input type="datetime-local" value={collectFrom} onChange={(e) => setCollectFrom(e.target.value)} className="input py-1.5 sm:py-1 text-xs w-full sm:w-auto" />
+          <input type="datetime-local" value={collectFrom} onChange={(e) => setCollectFrom(e.target.value)} className="input py-1.5 text-xs w-full" />
         </label>
-        <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5 text-slate-500">
+        <label className="flex flex-col gap-1 text-slate-500">
           Collect until
-          <input type="datetime-local" value={collectUntil} onChange={(e) => setCollectUntil(e.target.value)} className="input py-1.5 sm:py-1 text-xs w-full sm:w-auto" />
+          <input type="datetime-local" required value={collectUntil} onChange={(e) => setCollectUntil(e.target.value)} className="input py-1.5 text-xs w-full" />
         </label>
-        <button
-          disabled={saving}
-          onClick={() => updateProduct({ id: product._id, collectionStartTime: localDatetimeToISO(collectFrom), collectionEndTime: localDatetimeToISO(collectUntil) })}
-          className="btn-ghost text-xs px-2.5 py-2 sm:py-1 bg-slate-100 w-full xs:col-span-2 sm:w-auto"
-        >
-          Set collection time
+      </div>
+      <div className="flex items-end gap-2">
+        <label className="flex flex-col gap-1 text-slate-500 flex-1">
+          Quantity for this batch
+          <input type="number" min={1} required value={qty} onChange={(e) => setQty(e.target.value)} className="input py-1.5 text-xs w-full" />
+        </label>
+        <button disabled={saving} className="btn-primary text-xs px-3.5 py-2">
+          {saving ? 'Saving...' : isConfigured ? 'Update batch' : 'Open batch'}
         </button>
       </div>
-
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5 text-slate-500">
-          Next batch qty
-          <input
-            type="number"
-            min={0}
-            value={nextBatchQty}
-            onChange={(e) => setNextBatchQty(Number(e.target.value))}
-            className="input py-1.5 sm:py-1 text-xs w-24 sm:w-20"
-          />
-        </label>
-        <button
-          disabled={opening}
-          onClick={() =>
-            openNextBatch({
-              id: product._id,
-              prebookOpensAt: localDatetimeToISO(opensAt),
-              prebookCutoffTime: localDatetimeToISO(closesAt),
-              collectionStartTime: localDatetimeToISO(collectFrom),
-              collectionEndTime: localDatetimeToISO(collectUntil),
-              nextBatchQuantity: nextBatchQty,
-            })
-          }
-          className="btn-primary text-xs px-2.5 py-1"
-          title="Rolls today's live stock over from whatever was reserved before, then sets the qty above as the new next-batch stock for this window"
-        >
-          Open next batch
-        </button>
-      </div>
-    </div>
+    </form>
   );
 }
 
