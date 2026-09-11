@@ -77,6 +77,18 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // service is checkable without digging through host logs.
 app.get('/api/health', (req, res) => res.json({ status: 'ok', emailConfigured, paymentsConfigured }));
 
+// TEMPORARY diagnostic — remove once the gatewayOrderId unique-index issue
+// is confirmed fixed. Read-only, no data, just index metadata.
+app.get('/api/health/order-indexes', async (req, res) => {
+  try {
+    const Order = require('./models/Order');
+    const indexes = await Order.collection.indexes();
+    res.json({ indexes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/products', productRoutes);
