@@ -26,35 +26,52 @@ function distanceKm([lng1, lat1], [lng2, lat2]) {
 // Shared validation for both initiate and confirm — throws a plain Error
 // with a user-facing message on any problem. Returns the vendor doc and the
 // computed totals so callers don't repeat the arithmetic.
-async function validateAndPrice({ vendorId, items, orderType, fulfillmentMethod, scheduledFor, deliveryCoordinates }) {
+//
+// Every throw here is preceded by an explicit res.status() call. This
+// function used to just `throw new Error(...)` and let Express's default
+// error handler fall back to 500 — which is wrong for all of these: every
+// case here is a client/business-rule rejection (bad input, an unavailable
+// vendor, a full batch), not a server fault. res.status() is a plain mutation
+// on the passed-in response object, so setting it here and letting the throw
+// propagate all the way out through confirmPayment's transaction/finally
+// still lands on the right status code by the time the error handler runs.
+async function validateAndPrice(res, { vendorId, items, orderType, fulfillmentMethod, scheduledFor, deliveryCoordinates }) {
   if (!vendorId || !Array.isArray(items) || items.length === 0 || !orderType || !fulfillmentMethod) {
+    res.status(400);
     throw new Error('vendorId, items, orderType and fulfillmentMethod are required');
   }
 
   const vendor = await VendorProfile.findById(vendorId);
   if (!vendor || !vendor.isApproved) {
+    res.status(400);
     throw new Error('Vendor is not available for orders right now');
   }
   if (vendor.isSuspendedByAdmin) {
+    res.status(400);
     throw new Error('This kitchen has been paused by HomeBites and is not accepting orders right now');
   }
   if (!vendor.isOpen) {
+    res.status(400);
     throw new Error('Vendor is not available for orders right now');
   }
 
   if (fulfillmentMethod === 'Delivery') {
     const settings = await PlatformSettings.getSingleton();
     if (!settings.deliveryRolloutEnabled) {
+      res.status(400);
       throw new Error('Delivery is paused platform-wide for this rollout phase — please choose Takeaway or Pre-book.');
     }
     if (!vendor.deliveryEnabled) {
+      res.status(400);
       throw new Error('This vendor does not offer delivery');
     }
     if (!deliveryCoordinates || deliveryCoordinates.length !== 2) {
+      res.status(400);
       throw new Error('deliveryCoordinates [lng, lat] required for delivery orders');
     }
     const dist = distanceKm(vendor.kitchenLocation.coordinates, deliveryCoordinates);
     if (dist > vendor.maxDeliveryRadiusKm) {
+      res.status(400);
       throw new Error(
         `Delivery address is ${dist.toFixed(1)}km away, outside the vendor's ${vendor.maxDeliveryRadiusKm}km delivery radius`
       );
@@ -62,6 +79,7 @@ async function validateAndPrice({ vendorId, items, orderType, fulfillmentMethod,
   }
 
   if (orderType === 'Prebook' && !scheduledFor) {
+    res.status(400);
     throw new Error('scheduledFor is required for pre-booked orders');
   }
 
@@ -69,10 +87,14 @@ async function validateAndPrice({ vendorId, items, orderType, fulfillmentMethod,
   for (const line of items) {
     const product = await Product.findById(line.productId);
     if (!product || !product.isActive || String(product.vendor) !== String(vendor._id)) {
+      res.status(404);
       throw new Error(`Product ${line.productId} is not available from this vendor`);
     }
     const qty = Number(line.quantity);
-    if (!qty || qty < 1) throw new Error(`Invalid quantity for ${product.itemName}`);
+    if (!qty || qty < 1) {
+      res.status(400);
+      throw new Error(`Invalid quantity for ${product.itemName}`);
+    }
     itemsTotal += product.price * qty;
 
     // If the vendor has set a collection window for this item's next batch,
@@ -84,6 +106,7 @@ async function validateAndPrice({ vendorId, items, orderType, fulfillmentMethod,
       const start = product.collectionStartTime ? product.collectionStartTime.getTime() : -Infinity;
       const end = product.collectionEndTime ? product.collectionEndTime.getTime() : Infinity;
       if (Number.isNaN(when) || when < start || when > end) {
+        res.status(400);
         throw new Error(
           `${product.itemName} is only ready for collection between ${
             product.collectionStartTime ? product.collectionStartTime.toLocaleString() : 'now'
@@ -106,7 +129,7 @@ async function validateAndPrice({ vendorId, items, orderType, fulfillmentMethod,
 //        inventory is touched yet, since payment may never complete.
 // @route POST /api/orders/initiate
 const initiatePayment = asyncHandler(async (req, res) => {
-  const pricing = await validateAndPrice(req.body);
+  const pricing = await validateAndPrice(res, req.body);
   const paymentOrder = await createPaymentOrder({
     amountRupees: pricing.totalAmount,
     receipt: `order_${req.user._id}_${Date.now()}`,
@@ -147,8 +170,21 @@ const confirmPayment = asyncHandler(async (req, res) => {
     throw new Error('Payment could not be verified');
   }
 
+  // Idempotency fast path: if an order for this exact payment reference
+  // already exists — a client-side retry after a slow/dropped response, or
+  // the same request replayed — hand back the order that was already
+  // created instead of validating and reserving stock all over again. This
+  // is a plain read, so it can't fully close the race on its own (two
+  // requests can both pass it before either has written anything); the
+  // unique index on Order.gatewayOrderId below is what makes that race safe.
+  const existingOrder = await Order.findOne({ gatewayOrderId, paymentId });
+  if (existingOrder) {
+    res.status(200).json(existingOrder);
+    return;
+  }
+
   const { vendor, itemsTotal, deliveryFee, totalAmount, platformCommissionRate, platformCommissionAmount, vendorPayoutAmount } =
-    await validateAndPrice({ vendorId, items, orderType, fulfillmentMethod, scheduledFor, deliveryCoordinates });
+    await validateAndPrice(res, { vendorId, items, orderType, fulfillmentMethod, scheduledFor, deliveryCoordinates });
 
   const session = await mongoose.startSession();
   let createdOrder;
@@ -160,6 +196,7 @@ const confirmPayment = asyncHandler(async (req, res) => {
       for (const line of items) {
         const product = await Product.findById(line.productId).session(session);
         if (!product || !product.isActive || String(product.vendor) !== String(vendor._id)) {
+          res.status(404);
           throw new Error(`Product ${line.productId} is not available from this vendor`);
         }
 
@@ -168,6 +205,7 @@ const confirmPayment = asyncHandler(async (req, res) => {
 
         if (orderType === 'Direct') {
           if (!product.availableForDirectOrder) {
+            res.status(400);
             throw new Error(`${product.itemName} is not available for direct order`);
           }
           // Atomic conditional decrement prevents the race condition where two
@@ -178,6 +216,7 @@ const confirmPayment = asyncHandler(async (req, res) => {
             { new: true, session }
           );
           if (!updated) {
+            res.status(409);
             throw new Error(`Only limited stock left for ${product.itemName}; someone just grabbed it`);
           }
         } else {
@@ -190,6 +229,7 @@ const confirmPayment = asyncHandler(async (req, res) => {
             product.prebookCutoffTime.getTime() <= now ||
             windowNotOpenYet
           ) {
+            res.status(400);
             throw new Error(
               windowNotOpenYet
                 ? `Pre-booking for ${product.itemName} opens ${product.prebookOpensAt.toLocaleString()}`
@@ -203,6 +243,7 @@ const confirmPayment = asyncHandler(async (req, res) => {
             { new: true, session }
           );
           if (!updated) {
+            res.status(409);
             throw new Error(`Pre-book batch is full for ${product.itemName}`);
           }
         }
@@ -247,6 +288,22 @@ const confirmPayment = asyncHandler(async (req, res) => {
 
       createdOrder = order;
     });
+  } catch (err) {
+    // Closes the race the pre-check above can't: two requests for the same
+    // payment reference both passing the findOne above before either has
+    // written anything. The unique partial index on gatewayOrderId (see
+    // models/Order.js) makes the loser's insert fail with a duplicate-key
+    // error instead of silently succeeding — treat that specifically as
+    // "someone already processed this payment" and hand back that order,
+    // rather than surfacing a raw 500 for what is actually a success.
+    if (err?.code === 11000 && err?.keyPattern?.gatewayOrderId) {
+      const winner = await Order.findOne({ gatewayOrderId, paymentId });
+      if (winner) {
+        res.status(200).json(winner);
+        return;
+      }
+    }
+    throw err;
   } finally {
     session.endSession();
   }
@@ -293,11 +350,20 @@ const getVendorDashboard = asyncHandler(async (req, res) => {
   });
 });
 
+// Ready deliberately does NOT list 'Completed' here. The whole reason the
+// pickup-code/QR system (see verifyPickup below) exists is so a handoff has
+// to be verified — a customer's code scanned or typed in — rather than a
+// vendor just self-reporting "done". verifyPickup sets status: 'Completed'
+// directly (it doesn't consult this map at all), so a Takeaway order can
+// still reach Completed, just only through that checked path. A Delivery
+// order still reaches Completed through the normal OutForDelivery leg below,
+// which is the courier/driver completing the trip, not a pickup-counter
+// handoff, so it isn't gated behind a pickup code.
 const TRANSITIONS = {
   Pending: ['Accepted', 'Rejected'],
   Accepted: ['Preparing', 'Cancelled'],
   Preparing: ['Ready', 'Cancelled'],
-  Ready: ['OutForDelivery', 'Completed'],
+  Ready: ['OutForDelivery'],
   OutForDelivery: ['Completed'],
 };
 

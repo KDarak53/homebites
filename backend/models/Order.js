@@ -85,6 +85,23 @@ orderSchema.index({ vendor: 1, status: 1, createdAt: -1 });
 orderSchema.index({ user: 1, createdAt: -1 });
 orderSchema.index({ vendor: 1, pickupCode: 1 });
 
+// Makes "one order per payment" a hard database guarantee, not just an
+// application-level check — orderController.confirmPayment pre-checks for an
+// existing order by gatewayOrderId before creating one, but that check and
+// the later insert aren't atomic with each other, so two near-simultaneous
+// requests for the same payment could both pass the check. This index makes
+// the second insert fail with a duplicate-key error instead of silently
+// creating a second order, which confirmPayment specifically catches and
+// turns into "here's the order that already exists" rather than a 500.
+// Partial (not sparse) because gatewayOrderId defaults to '' rather than
+// being absent — a plain unique index would reject every second order that
+// doesn't go through the payment flow at all (e.g. subscription-generated
+// orders, which never set this field) as a duplicate empty string.
+orderSchema.index(
+  { gatewayOrderId: 1 },
+  { unique: true, partialFilterExpression: { gatewayOrderId: { $type: 'string', $ne: '' } } }
+);
+
 orderSchema.pre('save', function pushHistory(next) {
   if (this.isModified('status') || this.isNew) {
     this.statusHistory.push({ status: this.status, at: new Date() });
