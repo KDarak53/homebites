@@ -106,6 +106,44 @@ app.get('/api/health/order-index-create', async (req, res) => {
   }
 });
 
+// TEMPORARY, one-time cleanup — the index build above fails because a few
+// gatewayOrderId values already have duplicate orders sitting in the
+// collection from testing the bug this index exists to prevent. For each
+// duplicated gatewayOrderId, keeps the oldest order and deletes the rest.
+// Restocks whatever the deleted duplicates had reserved so their products'
+// stock isn't left short. GET (not POST) purely so it's easy to trigger from
+// a browser address bar for this one-off use — remove alongside the other
+// diagnostics once done.
+app.get('/api/health/dedupe-orders', async (req, res) => {
+  try {
+    const Order = require('./models/Order');
+    const Product = require('./models/Product');
+    const dupGroups = await Order.aggregate([
+      { $match: { gatewayOrderId: { $type: 'string', $gt: '' } } },
+      { $sort: { createdAt: 1 } },
+      { $group: { _id: '$gatewayOrderId', ids: { $push: '$_id' }, items: { $push: '$items' }, count: { $sum: 1 } } },
+      { $match: { count: { $gt: 1 } } },
+    ]);
+
+    const removed = [];
+    for (const group of dupGroups) {
+      const [, ...duplicateIds] = group.ids; // keep the first (oldest), drop the rest
+      const duplicateItemSets = group.items.slice(1);
+      for (const items of duplicateItemSets) {
+        for (const item of items) {
+          const field = item.fromBatch === 'next' ? 'nextBatchQuantity' : 'currentQuantity';
+          await Product.updateOne({ _id: item.product }, { $inc: { [field]: item.quantity } });
+        }
+      }
+      await Order.deleteMany({ _id: { $in: duplicateIds } });
+      removed.push({ gatewayOrderId: group._id, deleted: duplicateIds.length });
+    }
+    res.json({ dupGroupsFound: dupGroups.length, removed });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/products', productRoutes);
