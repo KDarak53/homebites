@@ -89,6 +89,23 @@ app.get('/api/health/order-indexes', async (req, res) => {
   }
 });
 
+// TEMPORARY diagnostic — attempts the index creation directly (bypassing
+// Mongoose's silent background autoIndex path) so the real MongoDB error, if
+// any, comes straight back in the response instead of only to a server log
+// nobody here can read.
+app.get('/api/health/order-index-create', async (req, res) => {
+  try {
+    const Order = require('./models/Order');
+    const name = await Order.collection.createIndex(
+      { gatewayOrderId: 1 },
+      { unique: true, partialFilterExpression: { gatewayOrderId: { $type: 'string', $gt: '' } } }
+    );
+    res.json({ created: name });
+  } catch (err) {
+    res.status(500).json({ error: err.message, code: err.code, codeName: err.codeName });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/products', productRoutes);
