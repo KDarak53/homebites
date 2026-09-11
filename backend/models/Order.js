@@ -97,9 +97,16 @@ orderSchema.index({ vendor: 1, pickupCode: 1 });
 // being absent — a plain unique index would reject every second order that
 // doesn't go through the payment flow at all (e.g. subscription-generated
 // orders, which never set this field) as a duplicate empty string.
+// $gt: '' (not $ne: '') deliberately — partialFilterExpression only supports
+// a limited operator set ($eq, $exists, $gt/$gte/$lt/$lte, $type, top-level
+// $and), and $ne is NOT one of them. Using it doesn't error — Mongoose logs
+// an 'index' event MongoDB rejects, which nothing here was listening for, so
+// the index silently never gets created and the whole guarantee this exists
+// for silently does nothing. $gt: '' is exactly equivalent for a string
+// field (every non-empty string sorts after '') and IS supported.
 orderSchema.index(
   { gatewayOrderId: 1 },
-  { unique: true, partialFilterExpression: { gatewayOrderId: { $type: 'string', $ne: '' } } }
+  { unique: true, partialFilterExpression: { gatewayOrderId: { $type: 'string', $gt: '' } } }
 );
 
 orderSchema.pre('save', function pushHistory(next) {
@@ -109,4 +116,16 @@ orderSchema.pre('save', function pushHistory(next) {
   next();
 });
 
-module.exports = mongoose.model('Order', orderSchema);
+const Order = mongoose.model('Order', orderSchema);
+
+// Mongoose builds indexes in the background after connecting and only
+// reports the outcome through this event — a failed index build (bad
+// partialFilterExpression, a pre-existing data conflict, whatever) does NOT
+// throw or crash the process, it just quietly never happens. That's exactly
+// how the gatewayOrderId uniqueness guarantee above went missing once
+// already; log it loudly enough to actually get noticed next time.
+Order.on('index', (err) => {
+  if (err) console.error('[Order] index build failed:', err.message);
+});
+
+module.exports = Order;
