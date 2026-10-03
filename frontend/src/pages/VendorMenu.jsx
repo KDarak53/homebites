@@ -230,11 +230,20 @@ export default function VendorMenu() {
   const { data: menu, isLoading: menuLoading } = useGetMenuByVendorQuery(id);
   const { data: plans } = useGetVendorPlansQuery(id);
   const cartVendorId = useSelector((s) => s.cart.vendorId);
+  const cartItems = useSelector((s) => s.cart.items);
 
   if (vendorLoading || menuLoading) return <p className="p-4 text-slate-500">Loading...</p>;
   if (!vendor) return <p className="p-4 text-red-600">Vendor not found</p>;
 
   const { emoji, gradient } = getVendorVisual(vendor._id);
+
+  // Show customers only dishes that can be ordered now or pre-booked now.
+  // Retain an existing cart item so its quantity can still be reduced if the
+  // stock or pre-book window changes after it was added.
+  const activeMenu = menu?.filter((item) => {
+    const isInCurrentCart = cartVendorId === vendor._id && cartItems.some((line) => line.productId === item._id);
+    return item.canOrderDirect || item.canPrebook || isInCurrentCart;
+  });
 
   return (
     <div className="max-w-3xl mx-auto p-4">
@@ -296,15 +305,15 @@ export default function VendorMenu() {
       )}
 
       <div className="flex flex-col gap-3">
-        {menu?.map((item) => (
+        {activeMenu?.map((item) => (
           <MenuItemCard key={item._id} item={item} vendorId={vendor._id} vendorName={vendor.businessName} />
         ))}
       </div>
 
-      {menu && menu.length === 0 && (
+      {menu && activeMenu?.length === 0 && (
         <div className="text-center py-16">
           <p className="text-5xl mb-3">🍽️</p>
-          <p className="text-slate-500">This vendor hasn't listed any items yet.</p>
+          <p className="text-slate-500">No dishes are available to order or pre-book right now.</p>
         </div>
       )}
     </div>
